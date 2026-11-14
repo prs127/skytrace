@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+scratch/
+.DS_Store
+dist_artifact/
+backend/sapm/

@@ -1,0 +1,9 @@
+.git
+cache
+scratch
+dist_artifact
+report
+tests
+**/__pycache__
+*.zip
+backend/sapm

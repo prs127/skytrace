@@ -1,0 +1,11 @@
+astropy>=7.0
+astroquery>=0.4.10
+pyvo>=1.6
+numpy>=2.0
+scipy>=1.13
+fsspec>=2024.9
+s3fs>=2024.9
+aiohttp>=3.10
+fastapi>=0.115
+uvicorn>=0.30
+photutils>=2.0

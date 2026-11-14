@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skytrace verification report (Prototype 2)</title>
+<style>
+  :root { --bg:#0b0f17; --card:#111827; --line:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --link:#7dd3fc; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; } h2 { font-size: 1.2rem; margin: 34px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 1rem; margin: 18px 0 6px; } p, li { color: var(--text); } .muted { color: var(--muted); font-size: .9rem; }
+  a { color: var(--link); } code { background:#0f172a; padding:1px 5px; border-radius:4px; font-size:.88em; }
+  table { width:100%; border-collapse: collapse; margin: 8px 0 14px; font-size: .9rem; }
+  th, td { text-align:left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; } th { color: var(--muted); font-weight: 600; }
+  .ok { color: var(--ok); font-weight: 600; } .warn { color: var(--warn); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
+  figure { margin: 10px 0 18px; background: #fff; border-radius: 8px; padding: 6px; } figure img { width:100%; display:block; border-radius: 4px; }
+  figure.dark { background: var(--card); } figcaption { color:#374151; font-size:.85rem; padding: 6px 4px 2px; } figure.dark figcaption { color: var(--muted); }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 10px 0; }
+  .tag { font-size:.75rem; padding: 0 6px; border-radius: 4px; background:#1e293b; color:#cbd5e1; margin-left:4px; }
+  ol li, ul li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Skytrace verification report</h1>
+<div class="muted">Team Skytrace · NASA Space Apps 2026 "Planet X and SPHEREx" · 14 Nov 2026 · All six IRSA SPHEREx tutorial notebooks were executed on the live archive and every printed value was compared with the published notebook pages.</div>
+
+<div class="box">
+<b>Bottom line.</b> All 6 tutorial notebooks run, and every published printed value checked matches exactly <span class="ok">(35 of 35)</span>. The Skytrace pipeline was then tested against the tutorials and against independent NASA WISE data:
+<ul>
+<li>raw pixels are identical to IRSA's cutout service;</li>
+<li>wavelengths agree within 0.07 nm;</li>
+<li>resampled images agree with astropy's standard <code>reproject</code>;</li>
+<li>star fluxes agree with WISE to within 2–3%;</li>
+<li>WISE 0855's motion agrees with 297 NEOWISE detections.</li>
+</ul>
+Two problems found: IRSA's cutout service failed on 12–35% of requests today, and Skytrace's 2-pixel photometry had to be corrected by 3–4% (now fixed).</div>
+
+<h2>P3. Prototype 3 audit: every calculation against the SPHEREx notebooks (14 Nov 2026)</h2>
+<div class="box"><b>Result.</b> Skytrace's photometry now <i>is</i> the method of IRSA's <b>SPHEREx Source Discovery Tool</b> notebook (<code>aperture_photometry.py</code>). On identical native pixels it equals the notebook's own functions to ≤2×10⁻⁶ in flux and error, and its bad-pixel decision matches in 47/47 exposures across 4 targets <span class="ok">(tests/notebook_parity.py)</span>.</div>
+<table>
+<tr><th>Step</th><th>Notebook</th><th>Skytrace before</th><th>Skytrace now</th><th>Check</th></tr>
+<tr><td>MJy/sr → µJy</td><td>× per-pixel solid-angle map (<code>cal-sapm-v3-2026-191</code>) × 23.5044</td><td>× header OMEGA_MEDIAN (scalar; per-pixel spread ±0.5%, up to 1.3%)</td><td>Per-pixel map, same file</td><td class="ok">1 MJy/sr·arcsec² = 23.50443 µJy (astropy); parity ≤2×10⁻⁶</td></tr>
+<tr><td>Aperture</td><td>photutils CircularAperture r = 3, 4, 5 px, subpixel ×5</td><td>r = 2 px, whole pixels by centre</td><td>r = 3 px, photutils subpixel ×5</td><td class="ok">identical</td></tr>
+<tr><td>Background</td><td>Annulus 7–16 px, sigma_clipped_stats(σ=3, 5 iters) median</td><td>4–7 px, own clipping</td><td>Same as notebook</td><td class="ok">identical</td></tr>
+<tr><td>Uncertainty</td><td>√ Σ VARIANCE × scale² (subpixel aperture)</td><td>Annulus scatter</td><td>Same as notebook</td><td class="ok">identical</td></tr>
+<tr><td>Image used</td><td>Raw IMAGE (ZODI not subtracted; annulus removes it)</td><td>IMAGE − ZODI</td><td>Raw IMAGE</td><td>Zodi pre-subtraction changed faint WISE 0855 by up to 7%: removed</td></tr>
+<tr><td>Bad pixels</td><td>Count CONTAINS_BAD_PIXEL flags in aperture (n_bad); plot keeps n_bad = 0</td><td>Masked and filled; own list (included OUTLIER)</td><td>Same list and rule; flagged points hidden by default</td><td class="ok">47/47 decisions agree</td></tr>
+<tr><td>Flag bit numbers</td><td>Read from each file's MSKN keywords</td><td>Hard-coded DR1 table</td><td>Read per file</td><td class="ok">Same bits in DR1, DR1-deep, QR3, QR3-deep</td></tr>
+<tr><td>Aperture correction</td><td>(not applied)</td><td>EE(r=2) 0.958–0.972</td><td>EE(r=3) 0.986–0.996 from the file's ePSF: our only addition, labelled as such</td><td>27 ePSFs per detector, spread &lt;0.5%</td></tr>
+<tr><td>Wavelength</td><td>WCS(key="W"), sip = None</td><td>Same</td><td>Same</td><td class="ok">unchanged (within 0.07 nm)</td></tr>
+</table>
+<h3>P3.1 Independent checks after rebuilding all six fields</h3>
+<ul>
+<li>Official DR1 spectral cube: Skytrace/cube median <span class="ok">0.997</span> and <span class="ok">1.010</span> for two isolated stars; every detector within ±3%.</li>
+<li>WISE W1/W2: median SPHEREx/WISE 1.04 (8 and 7 isolated stars; different bandpasses, so a few % is expected).</li>
+<li>Completeness: every image IRSA lists is in every field (R Dra capped at 700 of 2,493 on purpose).</li>
+<li>Barnard's Star and R Draconis saturate SPHEREx in every exposure (OVERFLOW, SUR_ERROR, BLOOM at the core), so the notebook rule leaves no clean points. The app says so instead of plotting unreliable numbers. Prototype 2 had plotted them, marked as flagged.</li>
+<li>Sky map: Mollweide round trip 2×10⁻¹³°; ecliptic and Galactic plane within 0.04″ of astropy.</li>
+<li>Live search on the Cloud Run build (clean environment, $PORT): 290 images in 85 s, same as IRSA's count.</li>
+</ul>
+
+<h2>0. Prototype 2 update: data sources audit and new checks</h2>
+<div class="box"><b>How Skytrace gets SPHEREx data.</b> Exactly as the <a href="https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/">SPHEREx archive guide</a> describes. Skytrace asks IRSA's SIA2 service for every image covering a position, searching <code>spherex_dr1</code> and <code>spherex_qr3</code> (and their deep-survey versions). It then reads only the needed pixels of each file from the AWS location in that file's <code>cloud_access</code> entry. Running the guide's <code>curl</code> request at WISE 0855's position returns 258 images: <span class="ok">the identical set Skytrace uses (258/258)</span>.</div>
+<table>
+<tr><th>Item in the app</th><th>Source now</th><th>Before</th></tr>
+<tr><td>102 channel numbers and wavelengths</td><td>Official SPHEREx DR1 <code>SPECTRAL_CHANNELS</code> table (DR1 all-sky cube)</td><td>My own 17 log-spaced bins per detector</td></tr>
+<tr><td>Detector wavelength ranges</td><td>Same official table (e.g. D1 0.74–1.12 µm)</td><td>Hard-coded (D1 0.75–1.09 µm, too narrow)</td></tr>
+<tr><td>WISE 0855 position and motion</td><td>Fit to 296 NEOWISE detections (NASA): −8.131 ± 0.014, +0.667 ± 0.014 ″/yr</td><td>Published paper value (−8.10, +0.70), outside the challenge resources</td></tr>
+<tr><td>Target descriptions</td><td>Challenge text only, plus Gaia DR3 proper motions</td><td>Unsourced facts (temperatures, periods)</td></tr>
+<tr><td>"How it works" text</td><td>Every statement linked to its source or measured here</td><td>Some unsourced numbers (e.g. a saturation limit)</td></tr>
+</table>
+
+<h3>0.1 Spectra vs the official SPHEREx DR1 all-sky cube</h3>
+<p>Two isolated stars were measured with Skytrace's own pipeline and with IRSA's official DR1 102-channel cube at the same position (the cube used in notebook 6). <span class="ok">Median ratio 0.998 (97 channels) and 1.014 (98 channels)</span>, consistent in all six detectors (0.99–1.04). This confirms both the official channel assignment and the flux scale.</p>
+<figure><img src="figs/cube_check_0.png" alt="Skytrace vs DR1 cube spectrum"><figcaption>Star 1 (Gaia DR3 6412596458823395328). Black: official DR1 cube. Blue: Skytrace, every exposure. Red: Skytrace median per official channel. The cube's spikes and dips (near 1.08, 2.4 and 3.9 µm) match the artefacts notebook 6 warns about near bright emission lines.</figcaption></figure>
+<figure><img src="figs/cube_check_1.png" alt="Second star"><figcaption>Star 2 (Gaia DR3 156429997483589120).</figcaption></figure>
+
+<h3>0.2 Problems that verification caught (all fixed)</h3>
+<table>
+<tr><th>Problem</th><th>How it was found</th><th>Fix and re-test</th></tr>
+<tr><td>Background ring excluded SPHEREx's SOURCE flag, which covers almost every pixel near bright stars. 47–100% of bright-target measurements had no local background or error bar.</td><td>Re-measuring with a different grid centre changed one flux by 0.16%</td><td>The ring now excludes only saturated or masked pixels, with a 3σ-clipped median. Synthetic star recovered to −0.13%. <span class="ok">Error bars missing: 0% (7 saturated R Dra exposures flagged).</span> Re-measurement with a different grid: identical (10/10).</td></tr>
+<tr><td>A dropped network request made Epsilon Indi B silently build from 120 of 458 images.</td><td>The exposure count changed between builds</td><td>Each collection query is retried, and the build fails rather than producing partial data. Every field records archive / requested / read counts. <span class="ok">Independent SIA2 check: all fields complete.</span> (R Dra: IRSA lists 2,493 images; capped at 700, spread evenly in time.)</td></tr>
+<tr><td>Photometry changed by up to 0.8% with grid placement.</td><td>Prototype 1 report</td><td>Measured on original detector pixels. <span class="ok">Identical across grids.</span></td></tr>
+<tr><td>My first cube comparison was 15% off.</td><td>Skytrace matched WISE but not the cube</td><td>My script used the HPX projection-plane pixel area, which is 3π/8 = 1.178× the true HEALPix sky area. Notebook 6 does this correctly. <span class="ok">Fixed in the test, not the app.</span></td></tr>
+</table>
+
+<h3>0.3 New features from WiseView, verified</h3>
+<ul>
+<li>The epoch legend shows which visits each frame adds (+), subtracts (−) or leaves out (·).</li>
+<li>Shift-and-add along a chosen proper motion (default: the target's). Test: Epsilon Indi B's centroid stays within ~0.1 px across four visits with shift on, and drifts up to 0.77 px with shift off.</li>
+<li>At these speeds (about 1 pixel of motion per year), shift-and-add does not yet raise the peak, because the resampling blurs about as much as the motion would. It should help for faster or fainter movers.</li>
+</ul>
+<p class="muted">Live server: a new position typed as sexagesimal coordinates returned 290 images in 65 s, identical to IRSA's independent count; reload from the URL took 0.8 s. WISE photometry re-check with the final pipeline: 0.976 (W1), 0.989 (W2).</p>
+
+<h2>1. Tutorial replication summary</h2>
+<table>
+<tr><th>Notebook</th><th>Ran</th><th>Published values checked</th><th>Key result</th></tr>
+<tr><td>1 Data Overview</td><td class="ok">yes</td><td class="ok">12 / 12 match</td><td>443 images at (304.69, 42.44). 6-extension file structure. Wavelength at the reference pixel 0.90417 µm. N_SOURCE = 4,135,535, re-counted from the FLAGS bits myself.</td></tr>
+<tr><td>2 Spectral Image Cutouts</td><td class="ok">yes</td><td class="ok">1 / 1 match</td><td>84 D2 images of M101. Cutout service failures: <span class="warn">19 (serial) and 10 (parallel) of 84</span>. The published run also had failures (4 and 16).</td></tr>
+<tr><td>3 PSF Models</td><td class="ok">yes</td><td class="ok">12 / 12 match</td><td>454 images. ePSF zone row 422 (BINX 2, BINY 20). N_eff 4.379 px. λ 2.433 µm. 21×21 zones. Total-flux checks 1.000.</td></tr>
+<tr><td>4 Source Discovery Tool</td><td class="ok">yes</td><td class="muted">none published</td><td>295 images. SExtractor found 142 objects in the D2 − D4 difference image. <span class="warn">99 of 284 cutouts failed with HTTP 503.</span> Image count reproduced independently (282 + 8 QR3 + 5 edge images = 295).</td></tr>
+<tr><td>5 Mosaic Cube</td><td class="ok">yes</td><td class="ok">4 / 4 match</td><td>M101 cube at 9″/px. PAH feature plane 63 (3.293 µm). GALEX position matches.</td></tr>
+<tr><td>6 HiPS All-Sky Cube</td><td class="ok">yes</td><td class="ok">6 / 6 match</td><td>Layer 62 ≈ 3.3 µm. Orders 0–5. HEALPix pixel 445. Cube shape (102, 512, 512).</td></tr>
+</table>
+<p class="muted">Environment: Python 3.13, astropy 8.0.2, astroquery 0.4.11, photutils, SExtractor 2.28. Notebooks from github.com/Caltech-IPAC/irsa-tutorials (main, 14 Nov 2026), executed unmodified with jupyter nbconvert. One published inconsistency: notebook 1's text says the example image is detector 2, but its own printed output (and ours) says detector 1.</p>
+
+<h2>2. What each notebook taught us, with our outputs</h2>
+<h3>Notebook 1: one SPHEREx file, all extensions</h3>
+<figure><img src="figs/nb1_extensions.png" alt="Six panels: image, image minus zodi, zodi model, variance, flags, wavelength map"><figcaption>Rendered from the same DR1 file the notebook uses. Bottom right: the linear variable filter makes wavelength change along the detector (0.74–1.13 µm on D1), so each exposure sees a star at a different colour. The bright horizontal stripe near y≈200 sits at about 1.08 µm, consistent with He I 1083 nm airglow (the header carries He-I airglow model keywords).</figcaption></figure>
+<h3>Notebook 2: cutouts of M101 at different wavelengths</h3>
+<figure><img src="figs/nb2_m101_cutouts.png" alt="Ten M101 cutouts"><figcaption>The tutorial's own figure, regenerated. The same galaxy looks different in every exposure because each one samples a different wavelength. This is the reason Skytrace groups exposures into visits and offers same-channel comparisons instead of a naive time-ordered movie.</figcaption></figure>
+<h3>Notebook 3: point spread function</h3>
+<figure><img src="figs/nb3_psf.png" alt="ePSF image, N_eff maps and drop-in tests"><figcaption>The PSF is undersampled (effective area 4.0–4.8 pixels) and changes across the detector and with wavelength. A star on a pixel centre looks sharper than one on a pixel corner (bottom), so slow movers "twinkle" when blinked. We used these ePSFs to compute Skytrace's aperture correction (section 3.3).</figcaption></figure>
+<h3>Notebooks 5 and 6: what 102 channels reveal</h3>
+<figure><img src="figs/nb5_mosaic.png" alt="M101 spectrum and PAH map"><figcaption>Notebook 5: integrated M101 spectrum (stellar 1.6 µm bump, PAH 3.3 µm) and the PAH feature map tracing the spiral arms.</figcaption></figure>
+<figure><img src="figs/nb6_hips.png" alt="HiPS cube tile and emission-line spectrum"><figcaption>Notebook 6: the all-sky HiPS cube (DR1, 102 layers) and a star-forming region showing Paβ, Paα, Brβ, PAH 3.3 µm, Brα and CO. The HiPS cube is one stack with no time information, so it suits a reference spectrum or background view, not blinking.</figcaption></figure>
+
+<h2>3. Skytrace verified against the tutorials and independent data</h2>
+<h3>3.1 Same M101 data, tutorial vs Skytrace</h3>
+<table>
+<tr><th>Check</th><th>Result</th></tr>
+<tr><td>Same exposures</td><td class="ok">All 74 tutorial cutouts are in Skytrace. Skytrace also has the 10 that failed at the cutout service.</td></tr>
+<tr><td>Wavelength assigned to each exposure</td><td class="ok">Median difference 0.002 nm, max 0.073 nm (target positions 0.6″ apart).</td></tr>
+<tr><td>Raw pixels: Skytrace S3 byte-range read vs IRSA cutout</td><td class="ok">Identical (maximum difference 0).</td></tr>
+<tr><td>Resampling: Skytrace vs astropy <code>reproject</code></td><td class="ok">Median |difference| 0.0001 MJy/sr. 99th percentile 0.4–1.2% of peak, only at pixels Skytrace masks on purpose.</td></tr>
+</table>
+<figure><img src="figs/xval_m101.png" alt="Native cutout, astropy reproject, Skytrace, difference"><figcaption>Left to right: tutorial cutout on native detector pixels; the same cutout resampled north-up with astropy (reference); Skytrace's own pipeline; difference (±5% of peak). White holes in panel 3 are pixels flagged bad (cosmic rays, outliers) that Skytrace removes; stacking fills them.</figcaption></figure>
+
+<h3>3.2 Photometry vs NASA WISE (independent mission)</h3>
+<figure><img src="figs/photval_wise.png" alt="SPHEREx vs WISE flux"><figcaption>Isolated stars in the five test fields plus M101. Skytrace SPHEREx flux in channels matching the WISE bands vs the CatWISE2020 catalogue: median ratio <b>0.967</b> (W1, 14 stars, 2% scatter) and <b>0.979</b> (W2, 12 stars, 7% scatter). The two outliers above the line are faint stars, probably blended with neighbours.</figcaption></figure>
+
+<h3>3.3 Aperture correction (fix applied)</h3>
+<p>From 27 real DR1 ePSFs per detector, a 2-pixel aperture holds 97.2% (D1), 97.0% (D2), 96.0% (D3, D4) and 95.8% (D5, D6) of a star's light, with less than 1% variation. Skytrace now divides by these values. A fresh build reproduces the corrected stored fluxes exactly (difference 0) when the grid centre is the same.</p>
+<p><span class="warn">Remaining issue:</span> photometry on the resampled grid shifts by up to 0.8% when the grid centre moves. Prototype 2 should measure on the original detector pixels.</p>
+
+<h3>3.4 WISE 0855: three datasets, one track</h3>
+<figure><img src="figs/w0855_track.png" alt="WISE 0855 position vs time"><figcaption>Blue: 297 NEOWISE single-exposure detections (IRSA TAP, 2014–2024). Black: the track Skytrace uses. Red stars: WISE 0855's centroid in Skytrace's SPHEREx stacks above 4 µm.</figcaption></figure>
+<ul>
+<li>NEOWISE proper motion fit: −8.13, +0.66 ″/yr. Skytrace uses −8.10, +0.70 ″/yr. <span class="ok">Agree within 0.04 ″/yr.</span></li>
+<li>Track positions agree with NEOWISE to within 1.0–1.4″ in 2014 and 2025 (0.2 SPHEREx pixel).</li>
+<li>SPHEREx centroids sit 2.3–2.8″ (0.4 px) from the straight-line track. The likely causes are the background star 8.8″ away (Gaia DR3 5756956644387831296, G = 16.3) and WISE 0855's ~0.4″ parallax, which the straight line ignores.</li>
+<li>WISE 0855 is detected at S/N 26–38 per visit above 4 µm and is invisible at short wavelengths, as expected for a ~285 K brown dwarf.</li>
+</ul>
+
+<h3>3.5 Earlier checks (Prototype 1)</h3>
+<ul>
+<li>Gaia DR3 stars fall within 0.04 px (median) of SPHEREx peaks in all five fields.</li>
+<li>Barnard's Star and Epsilon Indi B follow their Gaia proper motions within 0.1 px per visit.</li>
+<li>Epsilon Indi B is the only mover the finder reports in its field (34.6σ), with no false candidates.</li>
+</ul>
+
+<h2>4. WiseView: what we verified from its source code</h2>
+<p>The WiseView source (github.com/backyardworlds/wiseview, public domain) was read directly:</p>
+<ul>
+<li>The web page sends every setting to a separate AWS Lambda endpoint (<code>png-animation</code>) that builds the frames. That server code is not in the public repository, so its exact stacking cannot be inspected.</li>
+<li>Frames come from a sliding time window in years. Difference mode subtracts a second window (<code>neg_epochs</code>). The <code>+ − .</code> legend shows which epochs each frame adds, subtracts or skips.</li>
+<li>Shift-and-add moves frames by a chosen proper motion (in 2.75″ unWISE pixels) so a mover stays put and builds up signal. Synthetic sources can be injected to test what is detectable.</li>
+<li>Your screenshot shows <code>size</code> is in arcseconds: about 64 unWISE pixels × 2.75″ = 176″.</li>
+<li>The WiseView link in the challenge resources is centred exactly where WISE 0855 was in 2014.47 (0.05″ from our track). In your first frame (2014.3–2014.8) the faint smudge at the image centre should be WISE 0855.</li>
+</ul>
+<p><b>Ideas worth copying into Skytrace</b> (none built yet): the per-frame epoch legend; shift-and-add along a chosen proper motion; synthetic-source injection; click-to-recentre.</p>
+<figure class="dark"><img src="figs/wiseview_screenshot.png" alt="WiseView screenshot"><figcaption>Your WiseView screenshot: WISE 0855 field, W2, window 0.75 yr, first frame 2014.3–2014.8.</figcaption></figure>
+
+<h2>5. Problems and open items</h2>
+<ul>
+<li><span class="warn">IRSA cutout service reliability:</span> HTTP 503 errors on 12–35% of requests in notebooks 2 and 4 today. Skytrace reads from the AWS S3 mirror and had no failures.</li>
+<li>Saturation: Barnard's Star, RW Aur and R Dra are saturated in most exposures; their photometry is flagged and not science-grade.</li>
+<li>Photometry depends at the ~1% level on grid placement (fix: measure on native pixels).</li>
+<li>Mover-finder speeds are rough (Epsilon Indi B ~8″/yr measured vs 4.7″/yr true).</li>
+</ul>
+
+<h2>6. Reproduce</h2>
+<p class="muted">Scripts in the Skytrace repository under <code>tests/</code>:</p>
+<ul>
+<li><code>xval_m101.py</code>: tutorial vs pipeline</li>
+<li><code>photval.py</code>: WISE photometry</li>
+<li><code>ee_all.py</code>: aperture correction</li>
+<li><code>neowise_w0855.py</code>: WISE 0855 track</li>
+<li><code>render_intro.py</code>, <code>extract.py</code>: notebook outputs</li>
+<li><code>ui_test.py</code>, <code>live_test.py</code>: browser tests</li>
+</ul>
+<p class="muted">Data: SPHEREx DR1/QR3 (NASA/IPAC IRSA). Gaia DR3 (ESA), CatWISE2020 and NEOWISE-R single-exposure source table, all via IRSA TAP. WISE 0855 proper motion: Luhman &amp; Esplin (2016). Portions of the analysis code were generated with Claude (Anthropic) and reviewed by team Skytrace.</p>
+</main>
+</body>
+</html>
