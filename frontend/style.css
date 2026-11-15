@@ -21,8 +21,8 @@ body { background: #0b0f17; }
 .st-flagpill { display: inline-block; font-size: .65rem; padding: 0 4px; border-radius: 3px; margin: 0 2px 2px 0; background: #1e293b; color: #e2e8f0; }
 .st-flagpill.sat { background: #7f1d1d; } .st-flagpill.art { background: #713f12; } .st-flagpill.bad { background: #374151; }
 .mover-row { cursor: pointer; } .mover-row:hover { background: #1e293b; }
-body.embed .st-side, body.embed section.col-xl-3, body.embed .st-nav { display: none !important; }
-body.embed main { flex: 0 0 100%; max-width: 100%; }
+body.embed .st-nav { display: none !important; }
+
 .st-veilsky { position: static !important; width: min(92%, 520px) !important; height: auto; display: block; }
 #skyMap { border-radius: .25rem; }
 @media (prefers-reduced-motion: reduce) { .spinner-border { animation-duration: 3s; } }

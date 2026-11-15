@@ -9,11 +9,11 @@ async def main():
         await pg.goto(BASE + "?field=wise0855"); await pg.wait_for_timeout(6000)
         print("specNote wise0855:", await pg.inner_text("#specNote"))
         await pg.screenshot(path="/home/claude/scratch/p3_wise.png")
-        await pg.click("#targetButtons button[data-key=barnard]"); await pg.wait_for_timeout(4000)
+        await pg.click("#libTargets .st-item[data-key=barnard]"); await pg.wait_for_timeout(4000)
         print("specNote barnard:", await pg.inner_text("#specNote"))
         await pg.click('[data-bs-target="#tabLc"]'); await pg.wait_for_timeout(800)
         print("lc barnard:", (await pg.inner_text("#lcPlot"))[:120])
-        await pg.click("#targetButtons button[data-key=epsindib]"); await pg.wait_for_timeout(4000)
+        await pg.click("#libTargets .st-item[data-key=epsindib]"); await pg.wait_for_timeout(4000)
         await pg.click('[data-bs-target="#tabLc"]'); await pg.wait_for_timeout(800)
         print("lc epsindib has plot:", await pg.evaluate("!!document.querySelector('#lcPlot .main-svg')"))
         # pin + report

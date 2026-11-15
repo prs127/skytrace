@@ -21,9 +21,10 @@ sections 4–5 cover judging.
 | 10 | 2MASS / WISE points | Catalogue magnitudes × published zero points; target matched at each catalogue's own epoch with its motion; CatWISE motion-fit positions (`ra_pm`, MJD 57170) | Barnard's Star found in 2MASS at 0.3″ after ~170″ of motion; ambiguous CatWISE matches refused (WISE 0855: 3 entries) | Broad bands vs narrow channels; catalogue epochs differ from SPHEREx (stated) |
 | 11 | Light curve | Each clean point ÷ median of the same star in the same channel, so spectral shape cannot imitate variability | Fixed in this audit: the earlier version plotted raw flux per detector, mixing 17 channels | Needs ≥ 2 points per channel |
 | 12 | Shift-and-add | Resample each exposure along a trial motion | Moving target fixed to ≤ 0.15 px per visit (Eps Indi B), drifts 0.77 px without | Trial motion is linear (no parallax), as in WiseView |
-| 13 | Mover finder | 6σ positive/negative dipoles between first and last visit, catalogued static stars rejected | Finds Eps Indi B at 145σ | Not calibrated for completeness or false positives: labelled experimental |
+| 13 | Moving-object finder | Rebuilt after judge feedback (the old first-vs-last-visit dipole search mostly fitted noise). Sources detected in each visit stack (S/N ≥ 5 seeds, ≥ 3.5 confirmations); visits registered and position errors fitted on the field's non-moving Gaia DR3 stars (σ² = a² + b²/SNR²); straight-line linking; reported only if ≥ 3 visits and ≥ 2/3 of covering visits, line χ²/dof < 4, motion ≥ 5σ and ≥ 0.5 px, flux within ×3, no neighbour within 2 px, nothing within 4 px of saturation | (1) Known movers: WISE 0855 7.21 ± 1.39″/yr vs catalogue 8.16; Eps Indi B 4.51 ± 0.68 vs Gaia DR3 4.68; 0 reports in Barnard, RW Aur, R Dra, M101 (`movers_ref_result.txt`). (2) Injection on the real exposures, 6 fields × 2 seeds, 288 fake sources: 86/133 movers with ≥ 0.5 px shift recovered (63/74 at S/N 20–40), 0/144 still injections reported, 0 unexplained reports; quoted errors conservative (median |z| 0.21) (`movers_inject_result.txt`). (3) Independent Python implementation = browser on 12 fields, same objects and motions (`movers_parity.py`) | Needs ≥ 3 visits; saturated stars skipped (Barnard's Star); objects crossing the field within one visit (asteroids) not searched |
 | 14 | Overlays | Gaia DR3 (motion + parallax), CatWISE2020 (motion), 2MASS (at its 1997–2001 position), flags | Overlay toggles verified in the sweep | – |
-| 15 | Sky map, Aladin | Mollweide RA/Dec; ecliptic and Galactic plane from J2000 constants; Aladin on IRSA's SPHEREx HiPS cube | Map lines match astropy to 0.04″ | The HiPS cube is an all-epoch mosaic: no motion there (stated) |
+| 15 | Sky map, Atlas | Mollweide RA/Dec; ecliptic and Galactic plane from J2000 constants; Atlas = Aladin Lite on IRSA's SPHEREx DR1 HiPS cube, one channel map at a time | Map lines match astropy to 0.04″. `atlas_frames.py`: for all 100 non-blank channels, choosing channel k makes Aladin load cube frame k (100/100). Fixed in this audit: Aladin Lite 3.8.2's own slider maps slice numbers to frames non-linearly and in reverse, and its default slice (frame 50) is one of the two blank dichroic frames, so the old Atlas showed an empty map | The HiPS cube is an all-epoch mosaic at 12.9″ pixels: no motion there (stated) |
+| 16 | Older-survey comparison (DSS2, 2MASS, AllWISE) | Colour HiPS maps hosted by NASA IRSA (`irsa.ipac.caltech.edu/data/hips/CDS/...`), drawn by Aladin Lite at the field's centre and size. Switched from CDS identifiers in this audit: CDS has been unavailable since 9 Nov 2026, so the old buttons failed | `hips_align.py`: centroids of isolated slow Gaia DR3 stars (G 11–16.5, µ < 10 mas/yr) measured in the same tiles the viewer loads, all 6 fields. Worst-field median offset: DSS2 1.32″, 2MASS 0.45″, AllWISE 0.46″ (≤ 0.21 SPHEREx pixel). Eps Indi B appears in AllWISE where its Gaia motion puts it in 2010 (visual check) | DSS2 plates are 1950s–1990s, so its astrometry is coarser (stated as decades-old photographs). Aladin's usage logging to CDS is turned off |
 
 Still open (said openly): 2026 ED138 is not detected (V ≈ 19.8, crowded field); CSA NEOSSat data is not integrated
 (its archive was unreachable from the build environment, so it could not be verified); IRSA's Level-3
@@ -45,7 +46,7 @@ Still open (said openly): 2026 ED138 is not detected (V ≈ 19.8, crowded field)
 | Easy to update with new releases | See section 3 | Run-time discovery |
 | Display 102 bands creatively; per-detector stacks; spectra on the fly | Detector stacks and RGB, λ scan, channel strip, live spectrum | – |
 | Add or subtract images taken at different times | Difference (3 references) and custom A − B | Exact to 10⁻⁴ |
-| Let users choose the field of view | 9.1′ / 6′ / 4′ / 2.5′; Aladin for wider context | – |
+| Let users choose the field of view | New searches download 9′, 15′ or 20′ fields; view size 2.5′ up to the full field; Aladin for wider context | 15′ build checked (147 px, 0 movers in COSMOS) |
 | Overlay Gaia or WISE | Gaia DR3, CatWISE2020, plus 2MASS | Cross-match tests |
 | Coordinates in the URL, embeddable | Full view state in the URL; embed code | Share-link round trip in the sweep |
 | Display metadata such as contamination flags | Flag overlay, per-exposure flags table, `n_bad` | – |
@@ -87,3 +88,59 @@ Still open (said openly): 2026 ED138 is not detected (V ≈ 19.8, crowded field)
 - **Presentation:** depends on the demo. Suggested story: Pluto was found by blinking two images (challenge text), and
   Skytrace lets anyone blink SPHEREx. Show WISE 0855 moving, the parallax and distance, Epsilon Indi B with shift-and-add,
   then the spectrum checked against NASA's own tools.
+
+## 6. Where each control comes from: SPHEREx tutorials, WiseView, the challenge, or new
+
+IRSA tutorials (`caltech-ipac.github.io/irsa-tutorials`): **Intro** = Introduction to SPHEREx Spectral Images ·
+**Cutouts** = Download a collection of SPHEREx Spectral Image cutouts · **PSF** = Understanding and Extracting the ePSF
+Extension · **HiPS** = Using SPHEREx HiPS All-Sky Mosaic Cubes · **Mosaic** = Understanding and Analyzing SPHEREx Mosaic
+Cubes · **SDT** = SPHEREx Source Discovery Tool demo.
+
+| Control / panel | Origin | What Skytrace adds | Verified by |
+|---|---|---|---|
+| Archive search by RA/Dec (SIA2, all collections) | Intro, Cutouts, SPHEREx archive guide | Run-time discovery of new releases; DR preferred over QR | completeness.py, api_check.py |
+| Reading pixels from IRSA's AWS bucket | Intro (cloud access) | Exact byte-range reads plus a larger connection pool (bit-identical output; ~27% fewer bytes; 3.4 → 5.4 exposures/s in the build environment) | identical-output test |
+| IMAGE / FLAGS / VARIANCE / ZODI / EPSF / WCS-WAVE use | Intro | – | notebook parity |
+| Flag names from `MSKN` keywords | Intro, SDT | Flag overlay; per-exposure flag table | per-release bit check |
+| Wavelength per pixel (WCS key "W", `sip=None`) | Intro, Cutouts | Target-pixel wavelength in every exposure | 0.07 nm vs tutorial |
+| 102 channels (SPECTRAL_CHANNELS) | HiPS | Official per-pixel CHANNEL_MAP for each exposure | channel_check.py 52/52 |
+| ePSF | PSF | Aperture correction (encircled energy) | ee_all.py |
+| Photometry, solid-angle maps, `n_bad` rule | SDT | – (identical method) | notebook_parity.py ≤ 2×10⁻⁶ |
+| Reprojecting onto a common grid and subtracting | SDT (reproject + difference image) | Done live in the browser for any visits | validate_frames.py |
+| Spectral cube comparison | HiPS, Mosaic | – | cube_check.py 0.997 / 1.010 |
+| Blinking frames, visit windows, difference images, epoch legend (+ − ·), shift-and-add, stretch percentiles, FOV choice | WiseView (challenge resource) | Applied to SPHEREx's 102 channels | settings_sweep.py |
+| Detector stacks, spectra on the fly, add/subtract, FOV, Gaia/WISE overlays, URL/embed, flags, Astropy + Aladin, release updates | Challenge "Potential considerations" | – | AUDIT §2 |
+| Same-band blinking and λ-scan (channel-locked so the changing filter cannot fake motion) | **New** | – | sweep |
+| Visit-grouping sliders (gap and maximum length) | **New** | – | sweep |
+| Detector-balanced stacks, mesh-median background flattening | **New** | – | validate_frames.py |
+| 102-channel coverage strip | **New** | – | – |
+| Light curve with the spectrum divided out | **New** | – | sweep |
+| 2MASS overlay, 2MASS/WISE points on the spectrum (epoch-matched) | **New** | – | sed_check.py 0.98–1.03 |
+| Annual parallax; WISE 0855 parallax from NEOWISE | **New** (challenge background mentions parallax) | – | astropy GCRS 0.05 mas; 438 ± 36 mas |
+| Blend warning, mover finder (experimental), candidate report | **New** | – | ui_test.py |
+| All-sky "where in the sky" map, console interface, live server | **New** | – | map geometry test |
+| "?" help on every panel; quick start and glossary | **New** | – | new_ui_test.py |
+| Image-source switcher (DSS2 optical, 2MASS, AllWISE) | **New** (Aladin, a challenge consideration) | Same centre and field as the SPHEREx view; NASA IRSA's HiPS copies, so it works while CDS is down | src_geom.py: centre identical, field 9.10′ / 4.00′; hips_align.py: Gaia stars ≤ 1.32″ (DSS2), ≤ 0.46″ (2MASS, AllWISE) |
+| Console layout: control rail, image, tabbed data pane | **New** (WiseView-style image-first layout, modernised) | Panes fit the window and scroll on their own; controls can be hidden | layout_shot.py (5 window sizes), layout_ui_test.py |
+| Explore: 25 fastest-moving Gaia DR3 stars | **New** | Objective rule (pm > 3″/yr), Gaia motion and parallax | explore_test.py: marker within 0.04–0.23 px of the star |
+| Save image (PNG), download measurements (CSV) | **New** | – | new_ui_test.py: CSV = data (458/458 rows) |
+| Pages: one-off animated Welcome, Home, Dashboard, How to use | **New** (Material 3 drawer + side sheet; Worldview-style timeline) | Library on the left, analysis on the right, both collapsible; field notes and blend warning behind small i / ! buttons; long texts collapsible | layout_ui_test.py, user_walkthrough.py |
+| Saved places (named folders, rename, move, delete, notes, shareable folder link) | **New** (like map bookmarks) | Stored in the browser; the shared link carries the list, no server or accounts | user_walkthrough.py: folder opened in a fresh browser profile |
+| Export PDF, one place per file, tick-box sections | **New** | Images, spectrum plot and table, light curve, movers and method, visits, exposures, flags, pinned spot, notes, settings, credits (jsPDF 4.2.1, MIT) | user_walkthrough.py: PDF holds only the ticked sections |
+
+### User walkthrough (15 Nov 2026)
+`tests/user_walkthrough.py` follows the How-to-use guide as a first-time user and as an astronomer: 70/70 checks.
+It found three real bugs, all fixed: the dashboard collapsed after the spectrum's log-axis switch (Plotly's measuring box
+and the export panel entered the page layout); the page jumped to the bottom on load (the visit strip scrolled the
+page, not itself); the share link pointed at the welcome page instead of the dashboard. Reruns after the fixes:
+settings_sweep 72/72 × 3 targets, ui_test, new_ui_test, layout_ui_test, movers_parity 0 mismatches.
+
+## 7. Ideas considered and not built (and why)
+- **Community database of candidates, ratings and favourites:** left out for this deadline (needs accounts, moderation
+  and a persistent server; Cloud Run storage is temporary). Saved places and shared folder links cover personal use.
+- **"Your sky tonight" (planetarium for the user's location and time):** rejected. It uses no SPHEREx data, duplicates
+  free tools such as Stellarium, and would pull judges' attention away from the challenge objective (seeing SPHEREx images
+  change over time). The location-free all-sky map already shows where a target is.
+- **Server-side cutouts of other surveys (CDS hips2fits):** the service returned "Page unavailable" during development
+  (CDS has been unavailable since 9 Nov 2026), so the comparison views draw NASA IRSA's copies of the same HiPS maps
+  with Aladin Lite instead, and their alignment is checked in Python on the same tiles (`hips_align.py`).

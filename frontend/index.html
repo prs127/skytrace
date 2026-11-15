@@ -1,366 +1,135 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
-<!-- Skytrace, team Skytrace, NASA Space Apps Challenge 2026 ("Planet X and SPHEREx"). Data: NASA SPHEREx via IRSA. -->
+<!-- Skytrace, team Skytrace, NASA Space Apps Challenge 2026 ("Planet X and SPHEREx"). Welcome page. -->
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Skytrace: SPHEREx motion and spectrum viewer</title>
-<meta name="description" content="Blink SPHEREx infrared images of any patch of sky to find moving and changing objects, across all 102 spectral channels.">
+<title>Skytrace</title>
+<meta name="description" content="Skytrace: blink NASA SPHEREx's infrared sky and find what moves.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="vendor/bootstrap.min.css">
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="hud.css">
+<script>
+  // Links made before the welcome page existed pointed at "/?field=…", "/?ra=…" or a shared folder: go straight to the dashboard.
+  if (/[?&](field|ra|dec|embed|folder)=/.test(location.search)) location.replace('app.html' + location.search + location.hash);
+</script>
+<style>
+  html, body { margin: 0; height: 100%; background: #02040a; overflow: hidden; font-family: "Rajdhani", system-ui, sans-serif; }
+  #bg, #stars { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #bg { background: #02040a center / cover no-repeat; opacity: 0; transition: opacity 1.2s ease; }
+  #bg.on { opacity: 1; }
+  #shade { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(2, 4, 10, .15) 0%, rgba(2, 4, 10, .55) 70%, rgba(2, 4, 10, .85) 100%); }
+  .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .logo { position: relative; width: min(86vw, 1150px, calc((100vh - 140px) * 2.115)); aspect-ratio: 406 / 192; }
+  .logo img, .logo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .logo img { opacity: 0; transition: opacity 1.4s ease; filter: drop-shadow(0 0 18px rgba(120, 200, 255, .25)); }
+  .logo img.on { opacity: 1; }
+  .next { position: fixed; left: 50%; bottom: 7vh; transform: translateX(-50%); opacity: 0; pointer-events: none; transition: opacity .8s ease;
+    font: 700 1rem/1 "Rajdhani", system-ui, sans-serif; letter-spacing: .25em; text-transform: uppercase; color: #02121a; background: #40e0d0;
+    border: 0; padding: .9rem 2.4rem; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); cursor: pointer; text-decoration: none; }
+  .next.on { opacity: 1; pointer-events: auto; }
+  .next:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+  .skip { position: fixed; top: 1rem; right: 1.2rem; color: rgba(220, 235, 245, .7); font: 600 .85rem system-ui, sans-serif; text-decoration: none; letter-spacing: .05em; }
+  .skip:hover { color: #fff; }
+  .credit { position: fixed; left: 1rem; bottom: .7rem; color: rgba(200, 215, 230, .55); font: .72rem system-ui, sans-serif; max-width: 60vw; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
 </head>
 <body>
-<nav class="navbar border-bottom border-secondary-subtle px-3 py-2 st-nav">
-  <div class="d-flex align-items-center gap-2">
-    <img id="brandLogo" alt="Skytrace" height="50" class="d-none">
-    <svg id="brandSvg" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11.5" fill="none" stroke="#6ea8fe" stroke-width="1.5"/><circle cx="8" cy="15" r="2" fill="#adb5bd"/><circle cx="13" cy="12" r="2" fill="#ced4da"/><circle cx="18" cy="9" r="2.4" fill="#ffc107"/><path d="M8 15 L18 9" stroke="#ffc107" stroke-dasharray="1.5 2" stroke-width="1"/></svg>
-    <span class="navbar-brand mb-0 h1 fs-5">Skytrace</span>
-    <span class="text-secondary small d-none d-md-inline">SPHEREx motion &amp; spectrum viewer</span>
+<div id="bg" aria-hidden="true"></div>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div id="shade" aria-hidden="true"></div>
+<a class="skip" href="home.html">Skip intro</a>
+<main class="stage">
+  <h1 class="sr-only">Skytrace</h1>
+  <div class="logo" id="logo">
+    <img id="logoImg" src="assets/logo-nostar@2x.png" alt="Skytrace">
+    <canvas id="fx" aria-hidden="true"></canvas>
   </div>
-  <div class="hud-readout d-none d-lg-block" id="hudReadout" aria-live="off">Target <b id="hudTarget">—</b> &nbsp; RA/Dec <b id="hudCoord">—</b> &nbsp; UTC <b id="hudClock">--:--:--</b></div>
-  <div class="d-flex align-items-center gap-2">
-    <span id="modeBadge" class="badge text-bg-secondary">loading</span>
-    <a id="liveLink" class="btn btn-sm btn-success d-none" target="_blank" rel="noopener">Open live site</a>
-    <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#aboutModal">How it works</button>
-  </div>
-</nav>
+</main>
+<a class="next" id="next" href="home.html">Next</a>
+<div class="credit" id="credit"></div>
 
-<div class="container-fluid py-3">
-  <div class="row g-3">
-    <!-- ============ LEFT: controls ============ -->
-    <aside class="col-xl-3 col-lg-4 st-side">
-      <div class="card mb-3">
-        <div class="card-body">
-          <label for="coordInput" class="form-label small text-secondary mb-1">Coordinates (RA Dec) or target name</label>
-          <div class="input-group input-group-sm">
-            <input id="coordInput" class="form-control font-monospace" placeholder="08h55m10.83s -07d14m42.5s" autocomplete="off" spellcheck="false">
-            <button id="goBtn" class="btn btn-primary">Go</button>
-          </div>
-          <div id="coordMsg" class="form-text small"></div>
-          <div class="mt-2 d-flex flex-wrap gap-1" id="targetButtons"></div>
-        </div>
-      </div>
+<script>
+(function () {
+  'use strict';
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // ---- background: a photograph if one is supplied (assets/welcome-bg.jpg + its credit), otherwise drawn stars and galaxies
+  const BG = 'assets/welcome-bg.jpg', BG_CREDIT = (window.SKYTRACE_BG_CREDIT || '');
+  const probe = new Image();
+  probe.onload = () => { document.getElementById('bg').style.backgroundImage = `url(${BG})`; document.getElementById('bg').classList.add('on'); document.getElementById('stars').style.opacity = '.35'; document.getElementById('credit').textContent = BG_CREDIT; };
+  probe.src = BG;
+  const sc = document.getElementById('stars'), sg = sc.getContext('2d');
+  function drawSky() {
+    const dpr = Math.min(2, devicePixelRatio || 1), W = innerWidth, H = innerHeight; sc.width = W * dpr; sc.height = H * dpr; sg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const grd = sg.createRadialGradient(W * .5, H * .5, 0, W * .5, H * .5, Math.max(W, H) * .7); grd.addColorStop(0, '#0b1730'); grd.addColorStop(1, '#02040a'); sg.fillStyle = grd; sg.fillRect(0, 0, W, H);
+    // faint galaxies: soft tilted ellipses
+    for (let k = 0; k < 7; k++) {
+      const x = rnd() * W, y = rnd() * H, r = 18 + rnd() * 60, a = rnd() * Math.PI, hue = [210, 30, 280][k % 3];
+      sg.save(); sg.translate(x, y); sg.rotate(a); sg.scale(1, .35 + rnd() * .3);
+      const g = sg.createRadialGradient(0, 0, 0, 0, 0, r); g.addColorStop(0, `hsla(${hue},70%,85%,.35)`); g.addColorStop(.35, `hsla(${hue},60%,60%,.12)`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      sg.fillStyle = g; sg.beginPath(); sg.arc(0, 0, r, 0, 2 * Math.PI); sg.fill(); sg.restore();
+    }
+    for (let k = 0; k < (W * H) / 1800; k++) {
+      const x = rnd() * W, y = rnd() * H, m = Math.pow(rnd(), 3), r = .3 + m * 1.6;
+      sg.fillStyle = `rgba(${215 + 40 * rnd()},${225 + 30 * rnd()},255,${.35 + .65 * m})`; sg.beginPath(); sg.arc(x, y, r, 0, 2 * Math.PI); sg.fill();
+    }
+  }
+  drawSky(); addEventListener('resize', () => { drawSky(); drawFinal(); });
 
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold d-flex justify-content-between"><span>Where in the sky</span><span class="text-secondary fw-normal hud-keepcase" id="skyHere"></span></div>
-        <div class="card-body p-2">
-          <canvas id="skyMap" class="w-100 d-block" role="img" aria-label="All-sky map in equatorial coordinates showing the current search position"></canvas>
-          <div class="small text-secondary mt-1">All-sky map (RA/Dec). <span style="color:#ffc107">Dashed</span>: the ecliptic, the path of the planets; most solar-system objects stay near it. <span class="text-light">Band</span>: the Milky Way plane, where stars are most crowded. Blue diamonds are the challenge test fields. <span id="skyClickHint">Click the map to search there.</span></div>
-        </div>
-      </div>
+  // ---- logo geometry, in the logo image's own pixels (406 x 192): the outer ring of the logo is close to an ellipse
+  // centred (202, 97), semi-axes 207 x 40, tilted -19 degrees; the yellow star sits at (189.5, 31.5)
+  const LW = 406, LH = 192, E = { cx: 202, cy: 97, a: 207, b: 40, rot: -19 * Math.PI / 180 }, STAR = { x: 189.5, y: 31.5, r: 12.5 };
+  const fx = document.getElementById('fx'), g = fx.getContext('2d'), logo = document.getElementById('logo'), img = document.getElementById('logoImg');
+  let k = 1;
+  function size() { const r = logo.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); fx.width = r.width * dpr; fx.height = r.height * dpr; k = fx.width / LW; }
+  const P = (t) => [E.cx + E.a * Math.cos(t) * Math.cos(E.rot) - E.b * Math.sin(t) * Math.sin(E.rot), E.cy + E.a * Math.cos(t) * Math.sin(E.rot) + E.b * Math.sin(t) * Math.cos(E.rot)];
+  // where the upper arc passes under the star
+  let tStar = 4.65; { let best = 1e9; for (let t = 3.4; t < 6.2; t += 0.001) { const [x] = P(t); if (Math.abs(x - STAR.x) < best) { best = Math.abs(x - STAR.x); tStar = t; } } }
+  const T0 = Math.PI + 0.35, T1 = tStar - 2 * Math.PI;      // bottom arc from the lower left, round the right end, back along the top
+  function star(x, y, r, alpha) {
+    g.save(); g.translate(x * k, y * k); g.globalAlpha = alpha;
+    const R = r * k, w = R * .22;
+    const glow = g.createRadialGradient(0, 0, 0, 0, 0, R * 1.6); glow.addColorStop(0, 'rgba(255,240,120,.55)'); glow.addColorStop(1, 'rgba(255,240,120,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(0, 0, R * 1.6, 0, 2 * Math.PI); g.fill();
+    g.fillStyle = '#f4ee1c'; g.beginPath(); g.moveTo(0, -R); g.quadraticCurveTo(w, -w, R, 0); g.quadraticCurveTo(w, w, 0, R); g.quadraticCurveTo(-w, w, -R, 0); g.quadraticCurveTo(-w, -w, 0, -R); g.fill();
+    g.restore();
+  }
+  function rocket(x, y, ang, s, flame) {
+    g.save(); g.translate(x * k, y * k); g.rotate(ang); g.scale(s * k / 2, s * k / 2);
+    if (flame > 0) { const fl = g.createLinearGradient(-14, 0, -4, 0); fl.addColorStop(0, 'rgba(255,120,30,0)'); fl.addColorStop(1, 'rgba(255,200,80,.95)');
+      g.fillStyle = fl; g.beginPath(); g.moveTo(-4, -2.2); g.lineTo(-6 - 8 * flame, 0); g.lineTo(-4, 2.2); g.closePath(); g.fill(); }
+    g.fillStyle = '#e9f2f8'; g.beginPath(); g.moveTo(9, 0); g.quadraticCurveTo(5, -3.2, -4, -2.6); g.lineTo(-4, 2.6); g.quadraticCurveTo(5, 3.2, 9, 0); g.fill();
+    g.fillStyle = '#40e0d0'; g.beginPath(); g.arc(3, 0, 1.1, 0, 2 * Math.PI); g.fill();
+    g.fillStyle = '#9fb3c4'; g.beginPath(); g.moveTo(-1, -2.4); g.lineTo(-5, -5); g.lineTo(-4, -2.4); g.fill(); g.beginPath(); g.moveTo(-1, 2.4); g.lineTo(-5, 5); g.lineTo(-4, 2.4); g.fill();
+    g.restore();
+  }
+  function drawFinal() { size(); g.clearRect(0, 0, fx.width, fx.height); star(STAR.x, STAR.y, STAR.r, 1); }
+  function finish() { img.classList.add('on'); drawFinal(); setTimeout(() => document.getElementById('next').classList.add('on'), reduce ? 0 : 350); document.getElementById('next').focus({ preventScroll: true }); }
+  if (reduce) { finish(); return; }
 
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold">View</div>
-        <div class="card-body">
-          <div class="btn-group btn-group-sm w-100 flex-wrap mb-2" role="group" id="modeGroup">
-            <input type="radio" class="btn-check" name="mode" id="m-epoch" value="epoch"><label class="btn btn-outline-light" for="m-epoch" title="One stacked frame per sky visit">Visits</label>
-            <input type="radio" class="btn-check" name="mode" id="m-band" value="band"><label class="btn btn-outline-light" for="m-band" title="Same wavelength channel, different visits">Same band</label>
-            <input type="radio" class="btn-check" name="mode" id="m-scan" value="scan"><label class="btn btn-outline-light hud-keepcase" for="m-scan" title="Play through the 102 channels of one visit">λ scan</label>
-            <input type="radio" class="btn-check" name="mode" id="m-exp" value="exp"><label class="btn btn-outline-light" for="m-exp" title="Every exposure in time order">Exposures</label>
-            <input type="radio" class="btn-check" name="mode" id="m-custom" value="custom"><label class="btn btn-outline-light" for="m-custom" title="Add or subtract chosen visits">A − B</label>
-          </div>
-          <div id="modeHelp" class="small text-secondary mb-2"></div>
-
-          <label class="form-label small text-secondary mb-1">Detector / wavelength range</label>
-          <select id="detSel" class="form-select form-select-sm mb-2">
-            <option value="all">All 6 detectors stacked (0.75–5.0 µm)</option>
-            <option value="rgb">False colour: B=D1+D2, G=D3+D4, R=D5+D6</option>
-            <option value="lw">D5+D6</option>
-            <option value="sw">D1+D2+D3</option>
-            <option value="1">D1 0.75–1.09 µm</option>
-            <option value="2">D2 1.10–1.62 µm</option>
-            <option value="3">D3 1.63–2.41 µm</option>
-            <option value="4">D4 2.42–3.82 µm</option>
-            <option value="5">D5</option>
-            <option value="6">D6</option>
-          </select>
-
-          <div id="bandCtl" class="mb-2 d-none">
-            <label class="form-label small text-secondary mb-1">Channel <span id="bandLabel" class="text-light"></span></label>
-            <input type="range" class="form-range" id="bandRange" min="1" max="102" step="1">
-            <label class="form-label small text-secondary mb-1">Channel tolerance ± <span id="tolLabel"></span></label>
-            <input type="range" class="form-range" id="tolRange" min="0" max="8" step="1">
-          </div>
-          <div id="scanCtl" class="mb-2 d-none">
-            <label class="form-label small text-secondary mb-1">Visit to scan</label>
-            <select id="scanEpoch" class="form-select form-select-sm"></select>
-          </div>
-          <div id="customCtl" class="mb-2 d-none">
-            <div class="small text-secondary mb-1">Tick visits for A (added) and B (subtracted). Leave B empty to just stack A.</div>
-            <div id="customList" class="small"></div>
-          </div>
-
-          <div class="form-check form-switch small">
-            <input class="form-check-input" type="checkbox" id="diffToggle">
-            <label class="form-check-label" for="diffToggle">Difference image</label>
-          </div>
-          <select id="diffRef" class="form-select form-select-sm mt-1 mb-2" disabled>
-            <option value="first">minus first frame</option>
-            <option value="prev">minus previous frame</option>
-            <option value="others">minus mean of all other frames</option>
-          </select>
-
-          <div class="form-check form-switch small mt-1">
-            <input class="form-check-input" type="checkbox" id="saToggle">
-            <label class="form-check-label" for="saToggle" title="As in WiseView: shift each exposure along a proper motion so an object moving that way stays still and builds up signal">Shift-and-add along proper motion</label>
-          </div>
-          <div class="row g-1 mb-2 align-items-center small">
-            <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µα*</span><input id="saPmra" class="form-control" type="number" step="10"></div></div>
-            <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µδ</span><input id="saPmdec" class="form-control" type="number" step="10"></div></div>
-            <div class="col-12 d-flex justify-content-between"><span class="text-secondary">mas/yr</span><button class="btn btn-sm btn-outline-secondary py-0" id="saTarget" type="button" title="Use the target's catalogue proper motion">use target's motion</button></div>
-          </div>
-          <label class="form-label small text-secondary mb-1">Visit grouping: new visit after a gap of <span id="winLabel"></span> days</label>
-          <input type="range" class="form-range" id="winRange" min="2" max="120" step="1">
-          <label class="form-label small text-secondary mb-1">…and no visit longer than <span id="spanLabel"></span> days</label>
-          <input type="range" class="form-range" id="spanRange" min="5" max="400" step="5">
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold">Display</div>
-        <div class="card-body">
-          <div class="row g-2">
-            <div class="col-6">
-              <label class="form-label small text-secondary mb-1">Stretch</label>
-              <select id="stretchSel" class="form-select form-select-sm">
-                <option value="asinh">asinh</option><option value="linear">linear</option>
-                <option value="sqrt">sqrt</option><option value="log">log</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label small text-secondary mb-1">Colour map</label>
-              <select id="cmapSel" class="form-select form-select-sm">
-                <option value="gray">grey</option><option value="inferno">inferno</option>
-                <option value="viridis">viridis</option><option value="div">blue-red (diff)</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label small text-secondary mb-1">Low % <span id="loLabel"></span></label>
-              <input type="range" class="form-range" id="loRange" min="0" max="20" step="0.5">
-            </div>
-            <div class="col-6">
-              <label class="form-label small text-secondary mb-1">High % <span id="hiLabel"></span></label>
-              <input type="range" class="form-range" id="hiRange" min="90" max="100" step="0.1">
-            </div>
-            <div class="col-6">
-              <label class="form-label small text-secondary mb-1">Field of view</label>
-              <select id="fovSel" class="form-select form-select-sm">
-                <option value="9.1">9.1′ (full)</option><option value="6">6′</option>
-                <option value="4">4′</option><option value="2.5">2.5′</option>
-              </select>
-            </div>
-            <div class="col-6 d-flex flex-column justify-content-end">
-              <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="invToggle"><label class="form-check-label" for="invToggle">Invert</label></div>
-              <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="smoothToggle"><label class="form-check-label" for="smoothToggle">Smooth pixels</label></div>
-            </div>
-          </div>
-          <div class="form-check form-switch small mt-1">
-            <input class="form-check-input" type="checkbox" id="flatToggle" checked>
-            <label class="form-check-label" for="flatToggle">Flatten background (mesh median)</label>
-          </div>
-          <div class="form-check form-switch small">
-            <input class="form-check-input" type="checkbox" id="lockScale" checked>
-            <label class="form-check-label" for="lockScale">Same brightness scale for every frame</label>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold">Overlays</div>
-        <div class="card-body small">
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovTarget" checked><label class="form-check-label" for="ovTarget">Target: predicted position at each frame's date</label></div>
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovGaia"><label class="form-check-label" for="ovGaia">Gaia DR3 stars (ESA), moved to frame date</label></div>
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovWise"><label class="form-check-label" for="ovWise">CatWISE2020 sources (NASA WISE), moved to frame date</label></div>
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovTmass"><label class="form-check-label" for="ovTmass">2MASS sources (NASA/IPAC) where they were in 1997–2001: fast movers have left their circle</label></div>
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovFlags"><label class="form-check-label" for="ovFlags">Data-quality flags (<span class="text-danger">saturated</span>, <span class="text-warning">artefact</span>, <span class="text-secondary">masked</span>)</label></div>
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovMovers"><label class="form-check-label" for="ovMovers">Candidate movers (experimental)</label></div>
-          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ovCompass" checked><label class="form-check-label" for="ovCompass">Compass and 1′ scale bar</label></div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- ============ CENTRE: viewer ============ -->
-    <main class="col-xl-6 col-lg-8">
-      <div class="card mb-3">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-            <div>
-              <div class="fs-5 fw-semibold" id="fieldTitle">Loading…</div>
-              <div class="small text-secondary" id="fieldNote"></div>
-              <div class="small text-warning d-none" id="blendNote"></div>
-            </div>
-            <div class="text-end small">
-              <div id="frameLabel" class="fw-semibold"></div>
-              <div id="frameSub" class="text-secondary"></div>
-            </div>
-          </div>
-
-<div class="hud-scope">
-          <div class="st-viewer" id="viewerWrap">
-            <canvas id="imgCanvas"></canvas>
-            <canvas id="ovCanvas"></canvas>
-            <div id="loadingVeil" class="st-veil"><canvas id="veilSky" class="st-veilsky" aria-hidden="true"></canvas><div class="d-flex align-items-center gap-2 mt-2"><div class="spinner-border spinner-border-sm text-info" role="status"></div><div id="loadingText" class="small" role="status" aria-live="polite">Loading SPHEREx data…</div></div></div>
-          </div>
-          </div>
-
-          <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-            <div class="btn-group btn-group-sm">
-              <button class="btn btn-outline-light" id="prevBtn" title="Previous frame (←)">◀</button>
-              <button class="btn btn-info" id="playBtn" title="Play / pause (space)">▶ Play</button>
-              <button class="btn btn-outline-light" id="nextBtn" title="Next frame (→)">▶</button>
-            </div>
-            <input type="range" class="form-range flex-grow-1" id="frameRange" min="0" max="0" step="1" style="min-width:120px">
-            <label class="small text-secondary">Speed</label>
-            <input type="range" class="form-range" id="speedRange" min="80" max="2000" step="20" style="width:110px" title="milliseconds per frame">
-          </div>
-          <div id="filmstrip" class="st-filmstrip mt-2"></div>
-          <div id="epochLegend" class="small font-monospace mt-1"></div>
-
-          <div class="row g-2 mt-1 small">
-            <div class="col-md-7">
-              <div class="st-readout font-monospace" id="hoverReadout">Move over the image to read RA, Dec and brightness.</div>
-            </div>
-            <div class="col-md-5">
-              <div class="st-readout" id="pinBox">Click the image to pin a position.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold d-flex justify-content-between">
-          <span>102 SPHEREx channels: coverage of this field</span>
-          <span class="text-secondary" id="bandStripInfo"></span>
-        </div>
-        <div class="card-body py-2">
-          <canvas id="bandStrip" class="w-100" height="64"></canvas>
-          <div class="d-flex justify-content-between small text-secondary"><span>0.75 µm</span><span>D1</span><span>D2</span><span>D3</span><span>D4</span><span>D5</span><span>D6</span><span>5.0 µm</span></div>
-        </div>
-      </div>
-    </main>
-
-    <!-- ============ RIGHT: science panels ============ -->
-    <section class="col-xl-3 col-lg-12">
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold">Share this view</div>
-        <div class="card-body">
-          <input id="shareUrl" class="form-control form-control-sm font-monospace mb-2" readonly>
-          <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-info" id="copyLinkBtn">Copy link</button>
-            <button class="btn btn-sm btn-outline-info" id="copyEmbedBtn">Copy embed code</button>
-            <button class="btn btn-sm btn-outline-secondary" id="copyCoordBtn">Copy centre RA/Dec</button>
-            <button class="btn btn-sm btn-warning" id="reportBtn" data-bs-toggle="modal" data-bs-target="#reportModal">Report a candidate</button>
-          </div>
-          <div id="shareMsg" class="form-text small"></div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold">
-          <ul class="nav nav-tabs card-header-tabs" role="tablist">
-            <li class="nav-item"><button class="nav-link active py-1 px-2" data-bs-toggle="tab" data-bs-target="#tabSpec" type="button">Spectrum</button></li>
-            <li class="nav-item"><button class="nav-link py-1 px-2" data-bs-toggle="tab" data-bs-target="#tabLc" type="button">Light curve</button></li>
-            <li class="nav-item"><button class="nav-link py-1 px-2" data-bs-toggle="tab" data-bs-target="#tabMovers" type="button">Movers</button></li>
-            <li class="nav-item"><button class="nav-link py-1 px-2" data-bs-toggle="tab" data-bs-target="#tabAladin" type="button">Aladin</button></li>
-          </ul>
-        </div>
-        <div class="card-body tab-content p-2">
-          <div class="tab-pane fade show active" id="tabSpec">
-            <div id="specPlot" class="st-plot"></div>
-            <div class="small text-secondary">Target measured in every exposure on the original detector pixels at its predicted position, with the IRSA SPHEREx Source Discovery Tool method (3-pixel aperture, ePSF-corrected). Points whose aperture contains any pixel with a SPHEREx "bad pixel" flag (saturation, cosmic ray, ghost, persistence…) are hidden, or shown hollow if you switch them on.</div>
-            <div class="form-check form-switch small mt-1"><input class="form-check-input" type="checkbox" id="specLog"><label class="form-check-label" for="specLog">Log flux axis</label></div>
-            <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specClean" checked><label class="form-check-label" for="specClean">Hide points with flagged pixels (IRSA notebook rule: n_bad = 0 only)</label></div>
-            <div class="small text-info" id="specNote"></div>
-            <div class="small text-secondary">White diamonds: 2MASS J, H, Ks (NASA/IPAC, 1997–2001). Orange squares: WISE W1, W2 from CatWISE2020 (NASA, 2010–2018 data). Catalogue magnitudes converted with the published zero points; the target is matched at each catalogue's own epoch using its proper motion. Broad catalogue bands average over many SPHEREx channels, and variable stars change between epochs.</div>
-          </div>
-          <div class="tab-pane fade" id="tabLc">
-            <div id="lcPlot" class="st-plot"></div>
-            <div class="small text-secondary">Brightness change over time with the spectrum taken out: each clean measurement is divided by the median of all measurements of this target in the same SPHEREx channel. A steady star sits on 1; a variable star (e.g. R Draconis, RW Aurigae) moves away from 1. Coloured by detector.</div>
-          </div>
-          <div class="tab-pane fade" id="tabMovers">
-            <div class="small text-secondary mb-1">Dipoles (bright then dark) in the difference between the first and last visit, ≥6σ, saturated pixels ignored. Experimental: verify by eye.</div>
-            <div id="moverList" class="small"></div>
-          </div>
-          <div class="tab-pane fade" id="tabAladin">
-            <select id="aladinSurvey" class="form-select form-select-sm mb-1" aria-label="Aladin background survey">
-              <option value="spherex" selected>SPHEREx DR1 all-sky HiPS cube (IRSA, 102 slices)</option>
-              <option value="allwise">AllWISE colour (CDS)</option>
-              <option value="twomass">2MASS colour (CDS)</option>
-              <option value="dss">DSS2 colour (CDS)</option>
-            </select>
-            <div id="aladinDiv" style="width:100%;height:300px"></div>
-            <div id="aladinMsg" class="small text-secondary"></div>
-            <div class="small text-secondary">Interactive sky atlas: <a href="https://aladin.cds.unistra.fr/AladinLite/" target="_blank" rel="noopener">Aladin Lite</a> by CDS, Strasbourg.</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold d-flex justify-content-between"><span>Exposures in this frame</span><span id="expCount" class="text-secondary"></span></div>
-        <div class="card-body p-0 st-table-wrap">
-          <table class="table table-sm table-striped small mb-0">
-            <thead><tr><th>Date (UTC)</th><th>D</th><th>λ µm</th><th>Ch</th><th>Flags at target</th><th></th></tr></thead>
-            <tbody id="expTable"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card-header py-2 small fw-semibold">Data</div>
-        <div class="card-body small" id="provenance"></div>
-      </div>
-    </section>
-  </div>
-</div>
-
-<!-- About modal -->
-<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportTitle" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title" id="reportTitle">Report a candidate</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-    <div class="modal-body">
-      <p class="small text-secondary mb-2">Skytrace writes up what you are looking at: the link to this exact view, your pinned position, the nearest catalogued stars, and the SPHEREx exposures in the frame. Add your notes, then copy or download it to share with a teammate, a teacher, or a citizen-science community such as <a href="https://www.backyardworlds.org/" target="_blank" rel="noopener">Backyard Worlds: Planet 9</a>.</p>
-      <div class="small mb-2"><b>Before you report, check:</b>
-        <ul class="mb-0">
-          <li>It shows in <b>two or more visits</b> (step through the frames), not just one.</li>
-          <li>The pinned pixel is <b>not flagged</b> as saturated, masked or an artefact (shown in the report).</li>
-          <li>It is <b>not a known star</b>: the report lists the nearest Gaia DR3 and CatWISE2020 sources and their known motion.</li>
-          <li>For a moving dot, try <b>Shift-and-add</b> with its motion: a real mover becomes sharper.</li>
-        </ul></div>
-      <label for="reportNotes" class="form-label small mb-1">Your notes</label>
-      <textarea id="reportNotes" class="form-control form-control-sm mb-2" rows="2" placeholder="What did you see? In which frames?"></textarea>
-      <label for="reportText" class="form-label small mb-1">Report</label>
-      <textarea id="reportText" class="form-control form-control-sm font-monospace" rows="14" spellcheck="false"></textarea>
-      <div id="reportMsg" class="form-text small"></div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-sm btn-outline-info" id="reportCopy">Copy report</button><button class="btn btn-sm btn-info" id="reportDownload">Download .txt</button></div>
-  </div></div>
-</div>
-
-<div class="modal fade" id="aboutModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-    <div class="modal-header"><img src="assets/logo.png" srcset="assets/logo@2x.png 2x" alt="" height="44" class="me-3"><h5 class="modal-title">How Skytrace works</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-    <div class="modal-body small">
-      <p><b>The data.</b> SPHEREx maps the whole sky every six months in 102 near-infrared bands (challenge statement). Skytrace finds every SPHEREx spectral image covering your position with IRSA's SIA2 service, searching both <code>spherex_dr1</code> and <code>spherex_qr3</code> as the <a href="https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/" target="_blank" rel="noopener">SPHEREx archive guide</a> recommends. It reads only the needed pixels of each file from IRSA's AWS copy, using the file's <code>cloud_access</code> entry. It then subtracts the mission's zodiacal-light model (ZODI extension) and removes pixels flagged bad in the FLAGS extension. Finally it resamples every exposure onto one north-up grid with SPHEREx's 6.15″ pixel scale.</p>
-      <p><b>Why "visits".</b> Each SPHEREx detector sees a different wavelength across its surface (WCS-WAVE extension), so every exposure sees a star at a different colour; see the <a href="https://caltech-ipac.github.io/irsa-tutorials/spherex-intro" target="_blank" rel="noopener">IRSA introduction notebook</a>. A raw time-ordered movie therefore flickers because of colour, not motion. Skytrace stacks exposures by visit (clusters in time), stacks each detector separately and averages the detectors with equal weight, and offers same-channel comparisons.</p>
-      <p><b>The 102 channels.</b> Channel numbers, wavelength ranges and resolving powers come from the official SPHEREx DR1 <code>SPECTRAL_CHANNELS</code> table of the DR1 all-sky cube used in the <a href="https://caltech-ipac.github.io/irsa-tutorials/spherex-hipscube" target="_blank" rel="noopener">IRSA HiPS notebook</a>. Each exposure's channel is read from SPHEREx's official per-pixel channel map (<code>spectral_channels</code> calibration product) at the target's detector pixel; the exact wavelength there comes from the WCS-WAVE extension. Pixels the map leaves outside all 17 channels of a detector are shown in the spectrum at their measured wavelength but are not given a channel number.</p>
-      <p><b>Motion and distance.</b> The target's predicted position in every exposure includes its proper motion and its annual parallax (the shift caused by Earth orbiting the Sun), computed from Earth's position on that date. Gaia stars in the overlay are moved the same way. Parallaxes come from Gaia DR3; for WISE 0855, which Gaia cannot see, Skytrace measured it from 277 NEOWISE detections: 438 ± 36 mas (a distance of 2.3 pc), consistent with the published 438.9 ± 3.0 mas.</p>
-      <p><b>Spectrum and light curve.</b> The target is measured in every exposure on the original detector pixels, with the same method as IRSA's <a href="https://caltech-ipac.github.io/irsa-tutorials/" target="_blank" rel="noopener">SPHEREx Source Discovery Tool</a> tutorial: each pixel is converted from MJy/sr to µJy with SPHEREx's official solid-angle pixel map, then a 3-pixel-radius aperture (photutils, sub-pixel sampling) minus the sigma-clipped median of a 7–16 pixel annulus; the error comes from the VARIANCE extension. Our one added step: dividing by the fraction of light inside the aperture, measured from SPHEREx's own ePSFs (98.6–99.6%). Our code reproduces the tutorial's functions to better than one part in 100,000 on the same pixels.</p>
-      <p><b>Overlays and other missions.</b> Gaia DR3 (ESA), CatWISE2020 (NASA WISE/NEOWISE) and 2MASS (NASA/IPAC) catalogues, all via IRSA. The spectrum also shows the target's 2MASS J/H/Ks and WISE W1/W2 brightness, matched at each catalogue's own date using the target's motion; for ordinary stars they agree with SPHEREx to within a few percent. Gaia stars and the target are moved to each frame's date using their catalogue proper motions. WISE 0855 is not in Gaia; its motion was fitted to NEOWISE single-exposure detections (NASA). Flags show SPHEREx's own saturation (OVERFLOW, NONLINEAR), artefact (GHOST, HALO, BLOOM, STREAK, CROSSTALK) and masked pixels.</p>
-      <p><b>From WiseView.</b> Skytrace borrows WiseView's ideas (<a href="https://github.com/backyardworlds/wiseview" target="_blank" rel="noopener">source</a>): blinking time windows, difference images, the epoch legend (+ added, − subtracted, · unused) and shift-and-add along a chosen proper motion.</p>
-      <p><b>Sky map, Aladin and reports.</b> The "Where in the sky" map is a Mollweide projection of RA/Dec with the ecliptic and the Milky Way plane computed from standard J2000 constants; the little rocket only shows where you are going. The Aladin tab uses <a href="https://aladin.cds.unistra.fr/AladinLite/" target="_blank" rel="noopener">Aladin Lite</a> (CDS) on IRSA's SPHEREx DR1 all-sky HiPS cube, which combines all epochs, so motion is seen in the main viewer, not there. "Report a candidate" writes up the current view from data already on screen.</p>
-      <p><b>Limits.</b> Barnard's Star and R Draconis saturate SPHEREx, so their photometry is withheld (their images and motion are still shown). Motions are small compared with the 6.15″ pixels: Barnard's Star moves about 1.7 pixels per year, and parallax shifts are at most 0.09 pixel. Stacked frames average many channels, so they show positions, not spectra. In single-channel views the wavelength is exact at the target and drifts by up to half a channel at the corners of the full 9.1′ view. Displayed images are resampled bilinearly (measurements are not: they use the original pixels). The mover finder is experimental. For science-grade fluxes use IRSA's SPHEREx Spectrophotometry Tool.</p>
-      <p class="mb-0"><b>Credits.</b> Team Skytrace, 2026 NASA Space Apps Challenge "Planet X and SPHEREx". Data: NASA/IPAC Infrared Science Archive (SPHEREx, WISE/NEOWISE, Gaia DR3 mirror).</p>
-    </div>
-  </div></div>
-</div>
-
-<script src="vendor/bootstrap.bundle.min.js"></script>
-<script src="vendor/plotly.min.js" charset="utf-8"></script>
-<script src="config.js"></script>
-<script src="journey.js"></script>
-<script src="sky_aladin.js"></script>
-<script src="app.js"></script>
+  size(); setTimeout(() => img.classList.add('on'), 250);
+  const D_RING = 3300, D_RISE = 700, D_IN = 650, trail = []; let t0 = null;
+  const ease = (u) => u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+  function frame(now) {
+    if (t0 === null) t0 = now; const el = now - t0; g.clearRect(0, 0, fx.width, fx.height);
+    let x, y, ang, s = 1, flame = 1, starA = 0, done = false;
+    if (el < D_RING) {
+      const u = ease(el / D_RING), t = T0 + (T1 - T0) * u; [x, y] = P(t); const [x2, y2] = P(t - 0.01); ang = Math.atan2((y2 - y) * k, (x2 - x) * k);
+    } else if (el < D_RING + D_RISE) {
+      const u = ease((el - D_RING) / D_RISE), [xa, ya] = P(T1); x = xa + (STAR.x - xa) * u; y = ya + (STAR.y - ya) * u; ang = Math.atan2(STAR.y - ya, STAR.x - xa);
+    } else if (el < D_RING + D_RISE + D_IN) {
+      const u = (el - D_RING - D_RISE) / D_IN; x = STAR.x; y = STAR.y; ang = -Math.PI / 2; s = 1 - u; flame = 1 - u; starA = u;
+    } else { done = true; }
+    if (done) { finish(); return; }
+    trail.push([x, y]); if (trail.length > 26) trail.shift();
+    for (let i = 1; i < trail.length; i++) { g.strokeStyle = `rgba(255,190,90,${(i / trail.length) * .55})`; g.lineWidth = Math.max(1, 1.6 * k * (i / trail.length)); g.beginPath(); g.moveTo(trail[i - 1][0] * k, trail[i - 1][1] * k); g.lineTo(trail[i][0] * k, trail[i][1] * k); g.stroke(); }
+    if (starA > 0) star(STAR.x, STAR.y, STAR.r * (0.4 + 0.6 * starA), starA);
+    if (s > 0.02) rocket(x, y, ang, s, flame);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  addEventListener('keydown', (e) => { if (e.key === 'Enter' && document.getElementById('next').classList.contains('on')) location.href = 'home.html'; });
+})();
+</script>
 </body>
 </html>

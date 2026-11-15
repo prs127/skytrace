@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -58,9 +59,15 @@ def _add_to_index(meta: dict):
         tmp.replace(INDEX)
 
 
-def field_key(ra: float, dec: float, pmra: float, pmdec: float) -> str:
-    # ~4 arcsec rounding so repeated searches of the same spot hit the cache
-    h = hashlib.sha1(f"{ra:.3f},{dec:.3f},{pmra:.0f},{pmdec:.0f}".encode()).hexdigest()[:10]
+# Field sizes users can choose (arcmin -> grid pixels of 6.15"). Larger fields catch faster movers but take longer
+# to fetch: the archive reads scale with the number of image rows (about x1.6 for 15', x2.2 for 20').
+FIELD_SIZES = {9: 89, 15: 147, 20: 195}
+
+
+def field_key(ra: float, dec: float, pmra: float, pmdec: float, size: int = 9) -> str:
+    # ~4 arcsec rounding so repeated searches of the same spot hit the cache (size 9 keeps the original keys)
+    extra = "" if size == 9 else f",{size}"
+    h = hashlib.sha1(f"{ra:.3f},{dec:.3f},{pmra:.0f},{pmdec:.0f}{extra}".encode()).hexdigest()[:10]
     return f"f{h}"
 
 
@@ -81,8 +88,10 @@ def releases():
 @app.post("/api/field")
 def start_field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge=-90, le=90),
                 pmra: float = 0.0, pmdec: float = 0.0, epoch_mjd: float = 57388.0, plx: float = 0.0,
-                name: str | None = None, force: int = 0):
-    key = field_key(ra, dec, pmra, pmdec)
+                name: str | None = None, force: int = 0, size: int = 9):
+    if size not in FIELD_SIZES:
+        raise HTTPException(400, f"size must be one of {sorted(FIELD_SIZES)} arcmin")
+    key = field_key(ra, dec, pmra, pmdec, size)
     if not force and (DATA / f"{key}.json").exists():
         return {"id": None, "status": "done", "key": key, "message": "cached"}
     running = [j for j in JOBS.values() if j["status"] == "running"]
@@ -94,12 +103,14 @@ def start_field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge
     jid = uuid.uuid4().hex[:12]
     job = {"id": jid, "status": "running", "key": key, "message": "Queued", "started": time.time()}
     JOBS[jid] = job
-    label = name or f"RA {ra:.4f} Dec {dec:+.4f}"
+    # Shared, public list: only the Explore menu's own label format is accepted; visitors' personal names stay in their browser.
+    ok_name = name and re.fullmatch(r"Fast star \d{1,2}\.\d{2}″/yr \(Gaia DR3 \d{6,20}\)", name)
+    label = name if ok_name else f"RA {ra:.4f} Dec {dec:+.4f}"
     tgt = Target(key, label, ra, dec, pmra, pmdec, epoch_mjd, note="User search.", source="Coordinates entered by user", plx=plx)
 
     def run():
         try:
-            pkg = build_field(tgt, max_exposures=MAX_EXPOSURES, progress=lambda m: job.update(message=m))
+            pkg = build_field(tgt, npix=FIELD_SIZES[size], max_exposures=MAX_EXPOSURES, progress=lambda m: job.update(message=m))
             write_package(pkg, str(DATA))
             _add_to_index(pkg["meta"])
             job.update(status="done", message=f"Done: {len(pkg['meta']['exposures'])} exposures")

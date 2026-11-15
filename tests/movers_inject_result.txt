@@ -1,0 +1,19 @@
+wise0855  seed 1: psf sigma 1.07px  injected movers 12 (shift >= 0.5 px: 10)  recovered 4  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.44"/yr
+wise0855  seed 2: psf sigma 1.07px  injected movers 12 (shift >= 0.5 px: 11)  recovered 8  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.36"/yr
+epsindib  seed 1: psf sigma 0.88px  injected movers 12 (shift >= 0.5 px: 12)  recovered 5  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.33"/yr
+epsindib  seed 2: psf sigma 0.88px  injected movers 12 (shift >= 0.5 px: 12)  recovered 10  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.16"/yr
+barnard   seed 1: psf sigma 0.87px  injected movers 12 (shift >= 0.5 px: 11)  recovered 3  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.68"/yr
+barnard   seed 2: psf sigma 0.87px  injected movers 12 (shift >= 0.5 px: 11)  recovered 9  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.59"/yr
+rwaur     seed 1: psf sigma 0.91px  injected movers 12 (shift >= 0.5 px: 10)  recovered 9  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.32"/yr
+rwaur     seed 2: psf sigma 0.91px  injected movers 12 (shift >= 0.5 px: 11)  recovered 8  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.16"/yr
+rdra      seed 1: psf sigma 0.67px  injected movers 12 (shift >= 0.5 px: 12)  recovered 7  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.11"/yr
+rdra      seed 2: psf sigma 0.67px  injected movers 12 (shift >= 0.5 px: 11)  recovered 9  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.28"/yr
+m101      seed 1: psf sigma 1.38px  injected movers 12 (shift >= 0.5 px: 11)  recovered 5  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.38"/yr
+m101      seed 2: psf sigma 1.38px  injected movers 12 (shift >= 0.5 px: 11)  recovered 9  stationary injections reported as movers 0  other unexplained movers 0  |pm error| median 0.22"/yr
+
+TOTAL: recovered 86/133 detectable movers; false positives: 0 stationary injections, 0 unexplained
+pm error / quoted 1-sigma: median |z| 0.21 (0.67 expected for honest errors), 95th pct 1.57
+S/N  4-7 : recovered 2 of 6 injected movers with >= 1 px shift (rough: recovered ones include smaller shifts)
+S/N  7-12: recovered 3 of 10 injected movers with >= 1 px shift (rough: recovered ones include smaller shifts)
+S/N 12-20: recovered 18 of 26 injected movers with >= 1 px shift (rough: recovered ones include smaller shifts)
+S/N 20-40: recovered 63 of 74 injected movers with >= 1 px shift (rough: recovered ones include smaller shifts)

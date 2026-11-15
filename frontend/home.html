@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<!-- Skytrace, team Skytrace, NASA Space Apps Challenge 2026 ("Planet X and SPHEREx"). Data: NASA SPHEREx via IRSA. -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skytrace: blink SPHEREx's infrared sky and find what moves</title>
+<meta name="description" content="Compare NASA SPHEREx infrared images of any patch of sky over time to find moving and changing objects, and measure their light in 102 colours.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<script>
+  // Links made before the site had a home page pointed at "/?field=…" or "/?ra=…": send them to the dashboard.
+  if (/[?&](field|ra|dec|embed|folder)=/.test(location.search)) location.replace('app.html' + location.search + location.hash);
+</script>
+<link rel="stylesheet" href="vendor/bootstrap.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="hud.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header class="st-appbar" role="banner">
+  <a class="st-brand" href="home.html" title="Skytrace home"><img src="assets/logo.png" srcset="assets/logo@2x.png 2x" alt="Skytrace" height="34"></a>
+  <nav class="st-pages" aria-label="Pages"><a href="home.html" class="active" aria-current="page">Home</a><a href="app.html">Dashboard</a><a href="guide.html">How to use</a></nav>
+  <div class="st-appbar-right"><a class="btn btn-sm btn-info" href="app.html">Open the dashboard</a></div>
+</header>
+
+<main class="st-page st-home">
+  <section class="st-hero">
+    <div>
+      <h1>Blink the infrared sky.<br>Find what moves.</h1>
+      <p class="lead">NASA's SPHEREx telescope photographs the whole sky every six months in 102 colours of infrared light. Skytrace flips between those pictures so anyone can spot nearby stars, brown dwarfs and other objects that move or change, then measure their light.</p>
+      <div class="d-flex gap-3 align-items-center flex-wrap mt-4">
+        <a class="btn btn-info btn-lg" href="app.html">Open the dashboard</a>
+        <a class="st-link" href="guide.html">How to use Skytrace →</a>
+      </div>
+      <p class="small text-secondary mt-3 mb-0">Free, in your browser, no account. Pluto was found in 1930 the same way: by blinking two photographs.</p>
+    </div>
+    <div>
+      <canvas id="homeSky" class="st-skyart d-block" role="img" aria-label="All-sky map with the example targets; click one to open it"></canvas>
+      <div class="small text-secondary mt-1">Click a diamond to open an example.</div>
+    </div>
+  </section>
+
+  <section class="st-strip3" aria-label="How it works">
+    <div><span class="st-num">1</span><b>Pick a place</b><span>from the library, the sky map, or by name or coordinates</span></div>
+    <div><span class="st-num">2</span><b>Blink the visits</b><span>and watch what moves or changes</span></div>
+    <div><span class="st-num">3</span><b>Check and export</b><span>catalogue layers, motion test, spectrum, PDF report</span></div>
+  </section>
+
+  <section class="st-examples" aria-label="Examples">
+    <span class="st-examples-label">Try an example</span>
+    <span id="homeTargets"></span>
+  </section>
+
+  <section class="st-facts" aria-label="Checks">
+    <div><b>&lt; 1 in 100,000</b><span>difference from NASA IRSA's own SPHEREx photometry code on the same pixels</span></div>
+    <div><b>0 of 144</b><span>still test sources wrongly reported as moving</span></div>
+    <div><b>7.2 ± 1.4″/yr</b><span>measured for WISE 0855 (catalogue 8.2″/yr)</span></div>
+  </section>
+</main>
+<footer class="st-footer">Skytrace · NASA Space Apps Challenge 2026 · "Planet X and SPHEREx" · Data: NASA SPHEREx, WISE/NEOWISE, 2MASS via NASA/IPAC IRSA; ESA Gaia DR3.</footer>
+
+<script src="config.js"></script>
+<script src="journey.js"></script>
+<script>
+(async function () {
+  const BLURB = {
+    wise0855: 'A fast-moving brown dwarf: one of the coldest known. Brightest in SPHEREx’s longest wavelengths.',
+    barnard: 'The fastest-moving star in the sky, 10.4″ a year (Gaia DR3).',
+    epsindib: 'A pair of brown dwarfs orbiting a nearby star, moving 4.7″ a year.',
+    rwaur: 'A young variable star: watch its brightness change between visits.',
+    rdra: 'A pulsating red giant (a Mira variable) close to the north ecliptic pole, where SPHEREx looks very often.',
+    m101: 'Control field: the spot used in IRSA’s SPHEREx cutout tutorial.',
+  };
+  let idx = { fields: [] };
+  try { idx = await (await fetch('data/index.json', { cache: 'no-cache' })).json(); } catch (e) { /* offline */ }
+  const ready = (idx.fields || []).filter((f) => BLURB[f.key]);
+  document.getElementById('homeTargets').innerHTML = ready.map((f) => `<a class="st-pill" href="app.html?field=${encodeURIComponent(f.key)}" title="${BLURB[f.key]}">${f.name}</a>`).join('');
+  if (window.SkyJourney) {
+    SkyJourney.attach(document.getElementById('homeSky'), { labels: true, onPick: (ra, dec) => {
+      let best = null, bd = 1e9;
+      for (const f of ready) { const d = Math.hypot((f.ra - ra) * Math.cos(dec * Math.PI / 180), f.dec - dec); if (d < bd) { bd = d; best = f; } }
+      location.href = best && bd < 12 ? `app.html?field=${encodeURIComponent(best.key)}` : `app.html?ra=${ra.toFixed(4)}&dec=${dec.toFixed(4)}`;
+    } });
+    SkyJourney.setFields(ready.map((f) => ({ ...f, user: false })));
+  }
+})();
+</script>
+</body>
+</html>

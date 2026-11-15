@@ -39,6 +39,9 @@ warnings.filterwarnings("ignore", message=".*datfix.*")
 PIXSCALE_ARCSEC = 6.15            # SPHEREx native pixel scale (IRSA s_pixel_scale)
 N_CHANNELS_PER_DET = 17           # 6 detectors x 17 = 102 spectral channels
 TAP_URL = "https://irsa.ipac.caltech.edu/TAP"
+# Anonymous S3 access to IRSA's public bucket. botocore allows only 10 pooled connections by default, which capped a
+# field build at ~3.4 exposures/s however many worker threads ran (each exposure needs ~25 small range requests).
+S3_KW = {"anon": True, "config_kwargs": {"max_pool_connections": 96, "connect_timeout": 10, "read_timeout": 60, "retries": {"max_attempts": 4}}}   # a stalled read fails and is retried instead of hanging the search
 
 # ---- FLAGS bit planes (read from the MSKNxxxx keywords of the FLAGS HDU) ----
 BIT = {
@@ -229,7 +232,7 @@ def channel_map(release="dr1"):
                 arr = np.load(local)
             else:
                 with fits.open(f"s3://{SAPM_BUCKET}/{release}/spectral_channels/{ver}/spectral_channels_spx_{ver}.fits",
-                               use_fsspec=True, fsspec_kwargs={"anon": True}) as h:
+                               use_fsspec=True, fsspec_kwargs=S3_KW) as h:
                     arr = h["CHANNEL_MAP"].data.astype(np.uint8)
                 os.makedirs(os.path.dirname(local), exist_ok=True); np.save(local, arr)
         except Exception as exc:
@@ -265,6 +268,28 @@ def _s3_path(cloud_access: str) -> str:
     return f"s3://{aws['bucket_name']}/{aws['key']}"
 
 
+_FS = None
+
+
+def _read_rows(path, hdu, y0, y1, x0, x1):
+    """Rows y0..y1-1, columns x0..x1-1 of an uncompressed image HDU, fetched with a single S3 range request for exactly
+    those rows (astropy's .section through the fsspec read-ahead cache downloaded ~4x more). Verified bit-identical to
+    hdu.section[y0:y1, x0:x1] on DR1 and QR3 files."""
+    global _FS
+    if _FS is None:
+        import s3fs
+        _FS = s3fs.S3FileSystem(**S3_KW)
+    hd = hdu.header
+    nx, bp = int(hd["NAXIS1"]), abs(int(hd["BITPIX"])) // 8
+    dt = {-32: ">f4", -64: ">f8", 32: ">i4", 16: ">i2", 8: "u1"}[int(hd["BITPIX"])]
+    off = hdu._data_offset
+    buf = _FS.cat_file(path.replace("s3://", ""), start=off + y0 * nx * bp, end=off + y1 * nx * bp)
+    a = np.frombuffer(buf, dt).reshape(y1 - y0, nx)[:, x0:x1].astype(np.float32)
+    if hd.get("BSCALE", 1) != 1 or hd.get("BZERO", 0) != 0:
+        a = a * float(hd.get("BSCALE", 1)) + float(hd.get("BZERO", 0))
+    return a
+
+
 def fetch_stamp(row, grid_wcs: WCS, npix: int, target_track, retries: int = 3) -> Stamp | None:
     """Read only the needed pixels of one SPHEREx exposure from S3, subtract the
     zodiacal model, mask bad pixels, resample onto the common grid, and do
@@ -274,7 +299,7 @@ def fetch_stamp(row, grid_wcs: WCS, npix: int, target_track, retries: int = 3) -
     for attempt in range(retries):
         try:
             with fits.open(_s3_path(row["cloud_access"]), use_fsspec=True,
-                           fsspec_kwargs={"anon": True, "default_block_size": 2**18},
+                           fsspec_kwargs={**S3_KW, "default_block_size": 2**18},
                            lazy_load_hdus=True) as h:
                 hdr = h["IMAGE"].header
                 w = WCS(hdr)
@@ -289,9 +314,10 @@ def fetch_stamp(row, grid_wcs: WCS, npix: int, target_track, retries: int = 3) -
                 y0 = int(max(0, np.floor(np.nanmin(sy)) - 18)); y1 = int(min(ny, np.ceil(np.nanmax(sy)) + 19))
                 if x1 - x0 < 4 or y1 - y0 < 4:
                     return None
-                img = np.asarray(h["IMAGE"].section[y0:y1, x0:x1], dtype=np.float32)
-                zod = np.asarray(h["ZODI"].section[y0:y1, x0:x1], dtype=np.float32)
-                var = np.asarray(h["VARIANCE"].section[y0:y1, x0:x1], dtype=np.float32)
+                path = _s3_path(row["cloud_access"])
+                img = _read_rows(path, h["IMAGE"], y0, y1, x0, x1)       # one exact byte-range request each
+                zod = _read_rows(path, h["ZODI"], y0, y1, x0, x1)        # (bit-identical to .section, ~4x fewer bytes)
+                var = _read_rows(path, h["VARIANCE"], y0, y1, x0, x1)
                 flg = np.asarray(h["FLAGS"].section[y0:y1, x0:x1]).astype(np.int64)
                 MK = masks_from_header(h["FLAGS"].header)
                 # Wavelength at the target (per-pixel LVF lookup table, WCS key 'W')
@@ -454,7 +480,7 @@ def sapm(det, release="dr1"):
             arr = np.load(legacy)
         else:
             p = f"s3://{SAPM_BUCKET}/{rel}/solid_angle_pixel_map/{ver}/{det}/solid_angle_pixel_map_D{det}_spx_{ver}.fits"
-            with fits.open(p, use_fsspec=True, fsspec_kwargs={"anon": True}) as h:
+            with fits.open(p, use_fsspec=True, fsspec_kwargs=S3_KW) as h:
                 assert h["IMAGE"].header["BUNIT"].strip() == "arcsec2"
                 arr = h["IMAGE"].data.astype(np.float32)
             try:
@@ -523,16 +549,33 @@ def aperture_phot(img, cat, x, y, omega_arcsec2, var=None, nbad_map=None, r_ap=R
 # --------------------------------------------------------------------------
 # Catalog overlays (Gaia DR3 + CatWISE2020 via IRSA TAP)
 # --------------------------------------------------------------------------
-def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0):
+from concurrent.futures import ThreadPoolExecutor as _TPE
+_TAP_POOL = _TPE(max_workers=6)
+TAP_TIMEOUT = 180   # seconds per catalogue query
+
+
+def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0, top=400):
     import pyvo
     tap = pyvo.dal.TAPService(TAP_URL)
     out = {"gaia": [], "catwise": [], "tmass": []}
-    try:
-        q = (f"SELECT TOP 400 source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag "
+    # the three IRSA TAP queries run at the same time, each with a time limit: a slow catalogue service then costs
+    # at most TAP_TIMEOUT seconds and the field is still built (that overlay is empty and a warning is recorded)
+    queries = {
+        "gaia": (f"SELECT TOP {top} source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag "
              f"FROM gaia_dr3_source WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
              f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND phot_g_mean_mag < {gmax} "
-             f"ORDER BY phot_g_mean_mag")
-        for r in tap.run_sync(q).to_table():
+             f"ORDER BY phot_g_mean_mag"),
+        "catwise": (f"SELECT TOP {top} source_name, ra, dec, ra_pm, dec_pm, pmra, pmdec, w1mpro, w2mpro, w1sigmpro, w2sigmpro, meanobsmjd "
+             f"FROM catwise_2020 WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
+             f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND w2mpro < {w2max} ORDER BY w2mpro"),
+        "tmass": (f"SELECT TOP {top} designation, ra, dec, j_m, j_msigcom, h_m, h_msigcom, k_m, k_msigcom, jdate, ph_qual, cc_flg "
+             f"FROM fp_psc WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
+             f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND k_m < {kmax} ORDER BY k_m"),
+    }
+    futs = {k: _TAP_POOL.submit(lambda q=q: tap.run_sync(q).to_table()) for k, q in queries.items()}
+    out["warnings"] = []
+    try:
+        for r in futs["gaia"].result(timeout=TAP_TIMEOUT):
             out["gaia"].append({
                 "id": str(r["source_id"]), "ra": float(r["ra"]), "dec": float(r["dec"]),
                 "pmra": float(r["pmra"]) if np.isfinite(r["pmra"]) else 0.0,
@@ -540,12 +583,9 @@ def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0):
                 "plx": float(r["parallax"]) if np.isfinite(r["parallax"]) else None,
                 "g": round(float(r["phot_g_mean_mag"]), 2)})
     except Exception as exc:
-        print("[warn] gaia:", exc)
+        print("[warn] gaia:", exc); out["warnings"].append("Gaia DR3 catalogue unavailable: " + (str(exc) or type(exc).__name__))
     try:
-        q = (f"SELECT TOP 400 source_name, ra, dec, ra_pm, dec_pm, pmra, pmdec, w1mpro, w2mpro, w1sigmpro, w2sigmpro, meanobsmjd "
-             f"FROM catwise_2020 WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
-             f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND w2mpro < {w2max} ORDER BY w2mpro")
-        for r in tap.run_sync(q).to_table():
+        for r in futs["catwise"].result(timeout=TAP_TIMEOUT):
             out["catwise"].append({
                 # ra_pm/dec_pm: position from the motion fit at the CatWISE2020 epoch MJD 57170 (IRSA column docs);
                 # plain ra/dec is the stationary fit and is wrong for fast movers
@@ -559,19 +599,16 @@ def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0):
                 "w2": round(float(r["w2mpro"]), 2),
                 "w1e": _fin(r["w1sigmpro"]), "w2e": _fin(r["w2sigmpro"]), "mjd": _fin(r["meanobsmjd"], 2)})
     except Exception as exc:
-        print("[warn] catwise:", exc)
+        print("[warn] catwise:", exc); out["warnings"].append("CatWISE2020 catalogue unavailable: " + (str(exc) or type(exc).__name__))
     try:   # 2MASS Point Source Catalog (NASA/IPAC), no proper motions; each source has its own observation date
-        q = (f"SELECT TOP 400 designation, ra, dec, j_m, j_msigcom, h_m, h_msigcom, k_m, k_msigcom, jdate, ph_qual, cc_flg "
-             f"FROM fp_psc WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
-             f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND k_m < {kmax} ORDER BY k_m")
-        for r in tap.run_sync(q).to_table():
+        for r in futs["tmass"].result(timeout=TAP_TIMEOUT):
             out["tmass"].append({
                 "id": str(r["designation"]), "ra": float(r["ra"]), "dec": float(r["dec"]),
                 "j": _fin(r["j_m"]), "je": _fin(r["j_msigcom"]), "h": _fin(r["h_m"]), "he": _fin(r["h_msigcom"]),
                 "k": _fin(r["k_m"]), "ke": _fin(r["k_msigcom"]), "mjd": round(float(r["jdate"]) - 2400000.5, 4),
                 "q": str(r["ph_qual"]), "cc": str(r["cc_flg"])})
     except Exception as exc:
-        print("[warn] 2mass:", exc)
+        print("[warn] 2mass:", exc); out["warnings"].append("2MASS catalogue unavailable: " + (str(exc) or type(exc).__name__))
     return out
 
 
@@ -663,7 +700,7 @@ class Target:
     extra: dict = field(default_factory=dict)
 
 
-def build_field(t: Target, npix: int = 89, workers: int = 16, max_exposures: int | None = None,
+def build_field(t: Target, npix: int = 89, workers: int = 32, max_exposures: int | None = None,
                 collections: list[str] | None = None, progress=print) -> dict:
     t0 = time.time()
     collections = collections or discover_collections()
@@ -687,7 +724,8 @@ def build_field(t: Target, npix: int = 89, workers: int = 16, max_exposures: int
     stamps: list[Stamp] = []
     radius = npix * PIXSCALE_ARCSEC / 3600 / math.sqrt(2) + 0.01
     with ThreadPoolExecutor(max_workers=workers + 1) as ex:
-        cat_future = ex.submit(query_catalogs, float(cra), float(cdec), radius)   # runs alongside downloads
+        # same density of catalogue sources whatever the field size (400 per 9.1′ field)
+        cat_future = ex.submit(query_catalogs, float(cra), float(cdec), radius, top=int(400 * (npix / 89) ** 2))   # runs alongside downloads
         futs = [ex.submit(fetch_stamp, row, grid, npix, track) for row in rows]
         for i, f in enumerate(as_completed(futs), 1):
             s = f.result()
@@ -696,6 +734,7 @@ def build_field(t: Target, npix: int = 89, workers: int = 16, max_exposures: int
             if i % 25 == 0:
                 progress(f"[{t.key}] {i}/{len(futs)} read ({time.time() - t0:.0f}s)")
         cats = cat_future.result()
+    cat_warn = cats.pop("warnings", [])
     stamps.sort(key=lambda s: (s.meta["mjd"], s.meta["det"]))
     det_ranges = {}
     for row in rows:
@@ -711,7 +750,7 @@ def build_field(t: Target, npix: int = 89, workers: int = 16, max_exposures: int
         "collections": collections, "detectors": det_ranges, "channels_source": "SPHEREx DR1 SPECTRAL_CHANNELS",
         "photometry": PHOT_DESC,
         "built": Time.now().isot[:19] + "Z", "build_seconds": round(time.time() - t0, 1),
-        "exposures": [s.meta for s in stamps], "catalogs": cats,
+        "exposures": [s.meta for s in stamps], "catalogs": cats, "catalog_warnings": cat_warn,
         "sed": catalog_sed({"ra": t.ra, "dec": t.dec, "pmra": t.pmra, "pmdec": t.pmdec, "epoch_mjd": t.epoch_mjd}, cats),
         "encoding": {"image": "float16 little-endian, N x npix x npix, row 0 = south", "cat": "uint8 bitmask SAT=1 BAD=2 ART=4 SRC=8"},
     }

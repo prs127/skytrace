@@ -1,0 +1,51 @@
+DSS2 colour (shown)      wise0855  N=24  median dRA*cosDec=-0.56"  dDec=+0.16"  |median|=0.58" (0.67 px)  scatter=0.50"  pix=0.87"
+DSS2 colour (shown)      barnard   N=21  median dRA*cosDec=+0.54"  dDec=+0.31"  |median|=0.63" (0.72 px)  scatter=1.07"  pix=0.87"
+DSS2 colour (shown)      epsindib  N= 8  median dRA*cosDec=-0.98"  dDec=+0.88"  |median|=1.32" (1.51 px)  scatter=0.34"  pix=0.87"
+DSS2 colour (shown)      rwaur     N=23  median dRA*cosDec=-0.38"  dDec=+0.70"  |median|=0.79" (0.91 px)  scatter=0.55"  pix=0.87"
+DSS2 colour (shown)      rdra      N=12  median dRA*cosDec=+0.37"  dDec=+0.01"  |median|=0.37" (0.42 px)  scatter=0.87"  pix=0.87"
+DSS2 colour (shown)      m101      N= 5  median dRA*cosDec=+0.14"  dDec=+0.95"  |median|=0.96" (1.10 px)  scatter=0.35"  pix=0.87"
+2MASS colour (shown)     wise0855  N=24  median dRA*cosDec=+0.12"  dDec=+0.04"  |median|=0.13" (0.15 px)  scatter=0.21"  pix=0.87"
+2MASS colour (shown)     barnard   N=22  median dRA*cosDec=+0.16"  dDec=+0.42"  |median|=0.45" (0.52 px)  scatter=0.99"  pix=0.87"
+2MASS colour (shown)     epsindib  N= 8  median dRA*cosDec=-0.11"  dDec=+0.17"  |median|=0.21" (0.24 px)  scatter=0.34"  pix=0.87"
+2MASS colour (shown)     rwaur     N=23  median dRA*cosDec=+0.12"  dDec=+0.15"  |median|=0.19" (0.22 px)  scatter=0.41"  pix=0.87"
+2MASS colour (shown)     rdra      N=12  median dRA*cosDec=+0.13"  dDec=-0.09"  |median|=0.16" (0.18 px)  scatter=0.41"  pix=0.87"
+2MASS colour (shown)     m101      N= 5  median dRA*cosDec=-0.16"  dDec=+0.29"  |median|=0.33" (0.38 px)  scatter=0.43"  pix=0.87"
+AllWISE colour (shown)   wise0855  N=23  median dRA*cosDec=+0.03"  dDec=+0.12"  |median|=0.13" (0.07 px)  scatter=0.74"  pix=1.75"
+AllWISE colour (shown)   barnard   N=24  median dRA*cosDec=-0.07"  dDec=-0.10"  |median|=0.12" (0.07 px)  scatter=0.55"  pix=1.75"
+AllWISE colour (shown)   epsindib  N= 8  median dRA*cosDec=+0.18"  dDec=-0.10"  |median|=0.21" (0.12 px)  scatter=0.67"  pix=1.75"
+AllWISE colour (shown)   rwaur     N=22  median dRA*cosDec=-0.00"  dDec=-0.06"  |median|=0.06" (0.03 px)  scatter=0.59"  pix=1.75"
+AllWISE colour (shown)   rdra      N=11  median dRA*cosDec=+0.36"  dDec=-0.28"  |median|=0.46" (0.26 px)  scatter=0.47"  pix=1.75"
+AllWISE colour (shown)   m101      N= 3  median dRA*cosDec=-0.15"  dDec=+0.02"  |median|=0.15" (0.09 px)  scatter=0.73"  pix=1.75"
+DSS2 red FITS            wise0855  N=24  median dRA*cosDec=-0.34"  dDec=+0.70"  |median|=0.78" (0.89 px)  scatter=0.30"  pix=0.87"
+DSS2 red FITS            barnard   N=20  median dRA*cosDec=+0.53"  dDec=-1.12"  |median|=1.24" (1.42 px)  scatter=1.21"  pix=0.87"
+DSS2 red FITS            epsindib  N= 8  median dRA*cosDec=-0.79"  dDec=+0.58"  |median|=0.98" (1.12 px)  scatter=0.41"  pix=0.87"
+DSS2 red FITS            rwaur     N=23  median dRA*cosDec=-0.63"  dDec=+0.43"  |median|=0.76" (0.87 px)  scatter=0.34"  pix=0.87"
+DSS2 red FITS            rdra      N=12  median dRA*cosDec=-0.48"  dDec=+0.29"  |median|=0.56" (0.64 px)  scatter=0.28"  pix=0.87"
+DSS2 red FITS            m101      N= 5  median dRA*cosDec=+0.01"  dDec=+0.09"  |median|=0.09" (0.11 px)  scatter=0.35"  pix=0.87"
+DSS2 red JPEG            wise0855  N=21  median dRA*cosDec=+1.20"  dDec=+1.20"  |median|=1.69" (1.94 px)  scatter=0.48"  pix=0.87"
+DSS2 red JPEG            barnard   N= 6  median dRA*cosDec=+2.42"  dDec=+0.41"  |median|=2.46" (2.81 px)  scatter=0.23"  pix=0.87"
+DSS2 red JPEG            epsindib  N= 8  median dRA*cosDec=+1.01"  dDec=+0.96"  |median|=1.40" (1.60 px)  scatter=0.59"  pix=0.87"
+DSS2 red JPEG            rwaur     N=20  median dRA*cosDec=+0.90"  dDec=+0.62"  |median|=1.09" (1.24 px)  scatter=0.54"  pix=0.87"
+DSS2 red JPEG            rdra      N=11  median dRA*cosDec=+1.52"  dDec=-0.54"  |median|=1.61" (1.85 px)  scatter=0.86"  pix=0.87"
+DSS2 red JPEG            m101      N= 4  median dRA*cosDec=+1.96"  dDec=+0.50"  |median|=2.02" (2.32 px)  scatter=0.40"  pix=0.87"
+AllWISE W1 FITS          wise0855  N=24  median dRA*cosDec=-0.14"  dDec=-0.14"  |median|=0.19" (0.11 px)  scatter=0.48"  pix=1.75"
+AllWISE W1 FITS          barnard   N=24  median dRA*cosDec=-0.09"  dDec=+0.15"  |median|=0.18" (0.10 px)  scatter=0.44"  pix=1.75"
+AllWISE W1 FITS          epsindib  N= 8  median dRA*cosDec=-0.02"  dDec=+0.11"  |median|=0.11" (0.06 px)  scatter=0.47"  pix=1.75"
+AllWISE W1 FITS          rwaur     N=23  median dRA*cosDec=-0.24"  dDec=-0.04"  |median|=0.24" (0.14 px)  scatter=0.36"  pix=1.75"
+AllWISE W1 FITS          rdra      N=11  median dRA*cosDec=-0.33"  dDec=-0.05"  |median|=0.33" (0.19 px)  scatter=0.51"  pix=1.75"
+AllWISE W1 FITS          m101      N= 3  median dRA*cosDec=-0.46"  dDec=+0.18"  |median|=0.50" (0.28 px)  scatter=0.33"  pix=1.75"
+AllWISE W1 JPEG          wise0855  N=23  median dRA*cosDec=-0.14"  dDec=-0.02"  |median|=0.14" (0.08 px)  scatter=0.77"  pix=1.75"
+AllWISE W1 JPEG          barnard   N=24  median dRA*cosDec=-0.10"  dDec=+0.18"  |median|=0.20" (0.12 px)  scatter=0.50"  pix=1.75"
+AllWISE W1 JPEG          epsindib  N= 8  median dRA*cosDec=-0.00"  dDec=+0.19"  |median|=0.19" (0.11 px)  scatter=0.62"  pix=1.75"
+AllWISE W1 JPEG          rwaur     N=23  median dRA*cosDec=-0.09"  dDec=-0.04"  |median|=0.10" (0.06 px)  scatter=0.50"  pix=1.75"
+AllWISE W1 JPEG          rdra      N=11  median dRA*cosDec=-0.18"  dDec=+0.02"  |median|=0.18" (0.10 px)  scatter=0.59"  pix=1.75"
+AllWISE W1 JPEG          m101      N= 3  median dRA*cosDec=-0.15"  dDec=-0.21"  |median|=0.26" (0.15 px)  scatter=0.58"  pix=1.75"
+
+FAIL rows (|median offset| >= 0.25 SPHEREx pixel = 1.54" or too few stars): [('DSS2 red JPEG', 'wise0855', 21, np.float64(1.1968469252263674), np.float64(1.1991177530187969), np.float64(0.47926878662617006), np.float64(0.8739570507218734)), ('DSS2 red JPEG', 'barnard', 6, np.float64(2.4234588258302874), np.float64(0.4124585765378441), np.float64(0.2295606614168726), np.float64(0.8739570507218734)), ('DSS2 red JPEG', 'rdra', 11, np.float64(1.520241867626255), np.float64(-0.5376322065046679), np.float64(0.8631362396149356), np.float64(0.8739570507218734)), ('DSS2 red JPEG', 'm101', 4, np.float64(1.9606257782950045), np.float64(0.5024778402130892), np.float64(0.3999943000553926), np.float64(0.8739570507218734))]
+DSS2 colour (shown)      worst field |median offset| = 1.32"  (0.21 SPHEREx px)
+2MASS colour (shown)     worst field |median offset| = 0.45"  (0.07 SPHEREx px)
+AllWISE colour (shown)   worst field |median offset| = 0.46"  (0.07 SPHEREx px)
+DSS2 red FITS            worst field |median offset| = 1.24"  (0.20 SPHEREx px)
+DSS2 red JPEG            worst field |median offset| = 2.46"  (0.40 SPHEREx px)
+AllWISE W1 FITS          worst field |median offset| = 0.50"  (0.08 SPHEREx px)
+AllWISE W1 JPEG          worst field |median offset| = 0.26"  (0.04 SPHEREx px)

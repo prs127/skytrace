@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<!-- Skytrace, team Skytrace, NASA Space Apps Challenge 2026 ("Planet X and SPHEREx"). Data: NASA SPHEREx via IRSA. -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skytrace dashboard: blink SPHEREx images</title>
+<meta name="description" content="Blink SPHEREx infrared images of any patch of sky to find moving and changing objects, across all 102 spectral channels.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/bootstrap.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="hud.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body class="st-dash">
+<!-- ============ APP BAR: brand, pages, search, share ============ -->
+<header class="st-appbar st-nav" role="banner">
+  <a class="st-brand" href="home.html" title="Skytrace home">
+    <img id="brandLogo" alt="Skytrace" height="34" class="d-none">
+    <svg id="brandSvg" width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11.5" fill="none" stroke="#6ea8fe" stroke-width="1.5"/><circle cx="8" cy="15" r="2" fill="#adb5bd"/><circle cx="13" cy="12" r="2" fill="#ced4da"/><circle cx="18" cy="9" r="2.4" fill="#ffc107"/><path d="M8 15 L18 9" stroke="#ffc107" stroke-dasharray="1.5 2" stroke-width="1"/></svg>
+    <span class="st-brand-name">Skytrace</span>
+  </a>
+  <nav class="st-pages" aria-label="Pages"><a href="home.html">Home</a><a href="app.html" class="active" aria-current="page">Dashboard</a><a href="guide.html">How to use</a></nav>
+  <div class="st-search" data-help="search">
+    <div class="input-group input-group-sm">
+      <input id="coordInput" class="form-control font-monospace" placeholder="Name or RA Dec, e.g. 08h55m10.8s -07d14m42s" autocomplete="off" spellcheck="false" aria-label="Target name or coordinates (RA Dec)">
+      <select id="sizeSel" class="form-select st-size" aria-label="Field size for a new archive search" title="Field size for a new search. Bigger fields can follow faster-moving objects but take longer to download.">
+        <option value="9" selected>9′ field</option><option value="15">15′ field (slower)</option><option value="20">20′ field (slowest)</option>
+      </select>
+      <button id="goBtn" class="btn btn-primary">Search</button>
+    </div>
+    <div id="coordMsg" class="st-search-msg small"></div>
+  </div>
+  <div class="st-appbar-right">
+    <span id="modeBadge" class="badge text-bg-secondary">loading</span>
+    <a id="liveLink" class="btn btn-sm btn-success d-none" target="_blank" rel="noopener">Open live site</a>
+    <button class="btn btn-sm btn-outline-info" type="button" id="shareTop" title="Link, embed code, image and data downloads">Share</button>
+    <button class="btn btn-sm btn-info" type="button" id="exportTop" data-bs-toggle="offcanvas" data-bs-target="#exportPanel" aria-controls="exportPanel" title="Choose results and download a PDF for this place">Export PDF</button>
+  </div>
+</header>
+<input id="nameInput" type="hidden">
+
+<div class="st-shell" id="console">
+  <!-- ============ LEFT: library (navigation) ============ -->
+  <aside class="st-pane st-library st-side" id="rail" aria-label="Library">
+    <div class="st-pane-head"><span>Library</span><button class="btn btn-sm btn-outline-secondary py-0 px-2" id="railToggle" type="button" title="Hide the library" aria-controls="rail" aria-expanded="true">«</button></div>
+    <div class="st-pane-body">
+      <section class="st-skybox" data-help="sky">
+        <div class="st-sec-title">Where in the sky <span class="text-secondary fw-normal hud-keepcase small" id="skyHere"></span></div>
+        <canvas id="skyMap" class="w-100 d-block" role="img" aria-label="All-sky map in equatorial coordinates showing the current search position"></canvas>
+        <div class="small text-secondary mt-1" id="skyClickHint">Click the map to search there.</div>
+      </section>
+      <div class="st-folders" data-help="library">
+        <details class="st-folder" open><summary>Challenge targets <span class="st-count" id="libCountTargets"></span></summary><ul class="st-list" id="libTargets"></ul></details>
+        <details class="st-folder"><summary>Fastest-moving stars <span class="st-count" id="libCountFast"></span></summary>
+          <div class="small text-secondary px-2 pb-1">Largest motion in Gaia DR3 (over 3″/yr).</div>
+          <ul class="st-list" id="libFast"></ul></details>
+        <details class="st-folder" open id="savedFolder"><summary>Saved places <span class="st-count" id="libCountSaved"></span></summary>
+          <div class="px-2 pb-1 d-flex gap-1 flex-wrap"><button class="btn btn-sm btn-outline-info py-0" type="button" id="newFolderBtn">+ New folder</button></div>
+          <div id="libSaved"></div></details>
+        <details class="st-folder" open><summary>Your searches <span class="st-count" id="libCountMine"></span></summary>
+          <div class="small text-secondary px-2 pb-1" id="libMineEmpty">Places you search appear here. Names you give them stay in this browser.</div>
+          <ul class="st-list" id="libMine"></ul></details>
+      </div>
+      <select id="exploreSel" class="d-none" aria-hidden="true" tabindex="-1"><option value=""></option></select>
+      <div id="targetButtons" class="d-none"></div>
+    </div>
+  </aside>
+
+  <!-- ============ CENTRE: the image and how to play it ============ -->
+  <main class="st-pane st-stage" aria-label="Image viewer">
+    <div class="st-stage-head" data-help="viewer">
+      <div class="st-stage-title">
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2 d-none" id="railShow" type="button" title="Show the library" aria-controls="rail">» Library</button>
+        <h1 class="st-fieldname" id="fieldTitle">Loading…</h1>
+        <button class="st-ibtn" type="button" id="noteBtn" aria-label="About this field" aria-expanded="false" aria-controls="fieldNote">i</button>
+        <button class="st-ibtn st-ibtn-warn d-none" type="button" id="blendBtn" aria-label="Blend warning" aria-expanded="false" aria-controls="blendNote">!</button>
+        <div class="st-pop" id="fieldNote" role="note"></div>
+        <div class="st-pop st-pop-warn" id="blendNote" role="note"></div>
+      </div>
+      <div class="st-srcwrap"><span class="small text-secondary me-1">Compare with</span>
+        <div class="btn-group btn-group-sm st-srcgroup" role="group" aria-label="Image source" id="srcGroup">
+          <input type="radio" class="btn-check" name="src" id="src-spherex" value="spherex" checked><label class="btn btn-outline-light" for="src-spherex" title="SPHEREx images from IRSA (this tool)">SPHEREx</label>
+          <input type="radio" class="btn-check" name="src" id="src-dss" value="dss"><label class="btn btn-outline-light" for="src-dss" title="Digitized Sky Survey, optical photographic plates, 1950s–1990s (HiPS hosted by NASA IRSA)">DSS2</label>
+          <input type="radio" class="btn-check" name="src" id="src-2mass" value="twomass"><label class="btn btn-outline-light" for="src-2mass" title="2MASS J/H/Ks near-infrared, 1997–2001 (HiPS hosted by NASA IRSA)">2MASS</label>
+          <input type="radio" class="btn-check" name="src" id="src-wise" value="allwise"><label class="btn btn-outline-light" for="src-wise" title="AllWISE W1/W2/W4 mid-infrared, 2010–2011 (HiPS hosted by NASA IRSA)">AllWISE</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="st-layers" role="group" aria-label="Layers drawn on the image" data-help="overlays">
+      <span class="st-layers-label">Layers</span>
+      <input class="btn-check" type="checkbox" id="ovTarget" checked><label class="btn btn-sm st-chip" for="ovTarget" title="Yellow crosshair: where the target should be on each frame's date (proper motion and parallax)">Target</label>
+      <input class="btn-check" type="checkbox" id="ovGaia"><label class="btn btn-sm st-chip" for="ovGaia" title="Blue circles: Gaia DR3 stars (ESA), moved to the frame's date">Gaia DR3</label>
+      <input class="btn-check" type="checkbox" id="ovWise"><label class="btn btn-sm st-chip" for="ovWise" title="Orange squares: CatWISE2020 sources (NASA WISE), moved to the frame's date">CatWISE</label>
+      <input class="btn-check" type="checkbox" id="ovTmass"><label class="btn btn-sm st-chip" for="ovTmass" title="White diamonds: 2MASS sources where they were in 1997–2001. Fast movers have left their diamond.">2MASS</label>
+      <input class="btn-check" type="checkbox" id="ovFlags"><label class="btn btn-sm st-chip" for="ovFlags" title="SPHEREx data-quality flags: red saturated, yellow artefact, grey masked">Flags</label>
+      <input class="btn-check" type="checkbox" id="ovMovers"><label class="btn btn-sm st-chip" for="ovMovers" title="Pink tracks: moving objects found by the motion test (see the Moving objects tab)">Movers</label>
+      <input class="btn-check" type="checkbox" id="ovCompass" checked><label class="btn btn-sm st-chip" for="ovCompass" title="North/East arrows and a 1′ scale bar">Compass</label>
+    </div>
+
+    <div class="st-imgrow">
+      <div class="st-imgcol">
+        <div class="hud-scope">
+          <div class="st-viewer" id="viewerWrap">
+            <canvas id="imgCanvas"></canvas>
+            <canvas id="ovCanvas"></canvas>
+            <div id="srcView" class="st-srcview d-none"><div id="srcAladin" style="width:100%;height:100%"></div><div id="srcNote" class="st-srcnote small"></div></div>
+            <div id="loadingVeil" class="st-veil"><canvas id="veilSky" class="st-veilsky" aria-hidden="true"></canvas><div class="d-flex align-items-center gap-2 mt-2"><div class="spinner-border spinner-border-sm text-info" role="status"></div><div id="loadingText" class="small" role="status" aria-live="polite">Loading SPHEREx data…</div></div></div>
+          </div>
+        </div>
+        <div class="st-transport" data-help="timeline">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-light" id="prevBtn" title="Previous frame (←)" aria-label="Previous frame">◀</button>
+            <button class="btn btn-info" id="playBtn" title="Play / pause (space)">▶ Play</button>
+            <button class="btn btn-outline-light" id="nextBtn" title="Next frame (→)" aria-label="Next frame">▶</button>
+          </div>
+          <input type="range" class="form-range" id="frameRange" min="0" max="0" step="1" aria-label="Frame">
+          <span class="st-speed"><span class="small text-secondary st-speedlab">slow</span>
+          <input type="range" class="form-range" id="speedRange" min="80" max="2000" step="20" aria-label="Playback speed (right is faster)" title="Playback speed: right is faster">
+          <span class="small text-secondary st-speedlab">fast</span></span>
+        </div>
+        <div class="st-filmrow"><div id="filmstrip" class="st-filmstrip"></div><div id="epochLegend" class="small font-monospace"></div></div>
+      </div>
+      <aside class="st-imgside" aria-label="Frame details">
+        <div class="st-caption"><div id="frameLabel" class="fw-semibold"></div><div id="frameSub" class="text-secondary small"></div></div>
+    <div class="st-toolbar st-viewcard" data-help="view">
+      <div class="st-sec-title">What each frame shows</div>
+      <div class="btn-group btn-group-sm flex-wrap" role="group" id="modeGroup" aria-label="What each frame shows">
+        <input type="radio" class="btn-check" name="mode" id="m-epoch" value="epoch"><label class="btn btn-outline-light" for="m-epoch" title="One stacked frame per sky visit">Visits</label>
+        <input type="radio" class="btn-check" name="mode" id="m-band" value="band"><label class="btn btn-outline-light" for="m-band" title="Same wavelength channel, different visits">Same band</label>
+        <input type="radio" class="btn-check" name="mode" id="m-scan" value="scan"><label class="btn btn-outline-light hud-keepcase" for="m-scan" title="Play through the 102 channels of one visit">λ scan</label>
+        <input type="radio" class="btn-check" name="mode" id="m-exp" value="exp"><label class="btn btn-outline-light" for="m-exp" title="Every exposure in time order">Exposures</label>
+        <input type="radio" class="btn-check" name="mode" id="m-custom" value="custom"><label class="btn btn-outline-light" for="m-custom" title="Add some visits together and subtract others">Add / subtract</label>
+      </div>
+      <details class="st-about mt-0"><summary>About this mode</summary><span id="modeHelp"></span></details>
+      <select id="detSel" class="form-select form-select-sm st-tsel" aria-label="Detectors (wavelength range)" title="Which SPHEREx detectors (wavelength range) to stack">
+        <option value="all">All detectors 0.75–5.0 µm</option>
+        <option value="rgb">False colour (B: D1+D2, G: D3+D4, R: D5+D6)</option>
+        <option value="lw">D5+D6 (long, 3.8–5.0 µm)</option>
+        <option value="sw">D1+D2+D3 (short, 0.75–2.4 µm)</option>
+        <option value="1">D1 0.75–1.09 µm</option><option value="2">D2 1.10–1.62 µm</option><option value="3">D3 1.63–2.41 µm</option>
+        <option value="4">D4 2.42–3.82 µm</option><option value="5">D5 3.83–4.41 µm</option><option value="6">D6 4.42–5.00 µm</option>
+      </select>
+      <div class="st-diffrow"><div class="form-check form-switch small mb-0 st-diff"><input class="form-check-input" type="checkbox" id="diffToggle"><label class="form-check-label" for="diffToggle" title="Subtract a reference so only changes remain: a mover leaves a bright/dark pair">Difference</label></div>
+      <select id="diffRef" class="form-select form-select-sm" disabled aria-label="Difference reference">
+        <option value="first">− first frame</option><option value="prev">− previous frame</option><option value="others">− mean of others</option>
+      </select></div>
+      <select id="fovSel" class="form-select form-select-sm st-tsel" aria-label="Field of view shown" title="How much of the field to show (zoom)"></select>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="displayBtn">Display</button>
+        <div class="dropdown-menu dropdown-menu-end p-3 st-displaymenu" data-help="display">
+          <div class="row g-2">
+            <div class="col-6"><label class="form-label small text-secondary mb-1" for="stretchSel">Stretch</label>
+              <select id="stretchSel" class="form-select form-select-sm"><option value="asinh">asinh</option><option value="linear">linear</option><option value="sqrt">sqrt</option><option value="log">log</option></select></div>
+            <div class="col-6"><label class="form-label small text-secondary mb-1" for="cmapSel">Colour map</label>
+              <select id="cmapSel" class="form-select form-select-sm"><option value="gray">grey</option><option value="inferno">inferno</option><option value="viridis">viridis</option><option value="div">blue-red (differences)</option></select></div>
+            <div class="col-6"><label class="form-label small text-secondary mb-1">Black point % <span id="loLabel"></span></label><input type="range" class="form-range" id="loRange" min="0" max="20" step="0.5"></div>
+            <div class="col-6"><label class="form-label small text-secondary mb-1">White point % <span id="hiLabel"></span></label><input type="range" class="form-range" id="hiRange" min="90" max="100" step="0.1"></div>
+          </div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="invToggle"><label class="form-check-label" for="invToggle">Invert (dark stars on white)</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="smoothToggle"><label class="form-check-label" for="smoothToggle">Smooth pixels</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="flatToggle" checked><label class="form-check-label" for="flatToggle">Flatten background</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="lockScale" checked><label class="form-check-label" for="lockScale">Same brightness scale for every frame</label></div>
+        </div>
+      </div>
+    </div>
+    <div class="st-modeopts">
+      <div id="bandCtl" class="d-none">
+        <label class="form-label small text-secondary mb-0">Channel <span id="bandLabel" class="text-light"></span></label>
+        <input type="range" class="form-range" id="bandRange" min="1" max="102" step="1">
+        <label class="form-label small text-secondary mb-0">Channel tolerance ± <span id="tolLabel"></span></label>
+        <input type="range" class="form-range" id="tolRange" min="0" max="8" step="1">
+      </div>
+      <div id="scanCtl" class="d-none"><label class="form-label small text-secondary mb-1" for="scanEpoch">Visit to scan</label><select id="scanEpoch" class="form-select form-select-sm"></select></div>
+      <div id="customCtl" class="d-none"><div class="small text-secondary mb-1">Tick visits for A (added together) and B (subtracted). Leave B empty to just add A.</div><div id="customList" class="small"></div></div>
+    </div>
+
+
+        <div class="st-readout font-monospace small" id="hoverReadout">Move over the image to read RA, Dec and brightness.</div>
+        <div class="st-readout small" id="pinBox">Click the image to pin a position.</div>
+        <button class="btn btn-sm btn-outline-info w-100 mt-1" type="button" id="saveHereBtn" title="Save this place (or the pinned spot) to a folder in the Library">☆ Save this place</button>
+      </aside>
+    </div>
+
+    <div class="st-strip mt-2" data-help="channels">
+      <div class="st-strip-head small"><span>102 SPHEREx channels: coverage of this field</span><span class="text-secondary" id="bandStripInfo"></span></div>
+      <canvas id="bandStrip" class="w-100" height="64"></canvas>
+      <div class="d-flex justify-content-between small text-secondary"><span>0.75 µm</span><span>D1</span><span>D2</span><span>D3</span><span>D4</span><span>D5</span><span>D6</span><span>5.0 µm</span></div>
+    </div>
+  </main>
+
+  <!-- ============ RIGHT: analysis side sheet ============ -->
+  <section class="st-pane st-data" id="sheet" aria-label="Analysis">
+    <div class="st-pane-head"><span>Analysis</span><button class="btn btn-sm btn-outline-secondary py-0 px-2" id="sheetToggle" type="button" title="Hide the analysis panel" aria-controls="sheet" aria-expanded="true">»</button></div>
+    <ul class="nav nav-tabs st-data-tabs" role="tablist">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabSpec" type="button" role="tab">Spectrum</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLc" type="button" role="tab">Light curve</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMovers" type="button" role="tab">Moving objects</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabExp" type="button" role="tab">Exposures <span id="expCount" class="st-count"></span></button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAladin" type="button" role="tab">Atlas</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSettings" type="button" role="tab">Visits</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabShare" type="button" role="tab" id="tabShareBtn">Share</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabData" type="button" role="tab">Sources</button></li>
+    </ul>
+    <div class="tab-content st-data-body">
+      <div class="tab-pane fade show active" id="tabSpec" role="tabpanel" data-help="spectrum">
+        <div id="specPlot" class="st-plot"></div>
+        <div class="d-flex gap-3 flex-wrap">
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specLog"><label class="form-check-label" for="specLog">Log flux axis</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specClean" checked><label class="form-check-label" for="specClean">Hide points with flagged pixels</label></div>
+        </div>
+        <div class="small text-info" id="specNote"></div>
+        <details class="st-about"><summary>About this plot</summary>Built on the fly from every exposure: the target is measured on the original detector pixels at its predicted position, with the IRSA SPHEREx Source Discovery Tool method (3-pixel aperture, ePSF-corrected). Points whose aperture holds a flagged pixel are hidden unless you switch them on. White diamonds: 2MASS J, H, Ks. Orange squares: WISE W1, W2 (CatWISE2020), matched at each catalogue's own date.</details>
+      </div>
+      <div class="tab-pane fade" id="tabLc" role="tabpanel" data-help="lightcurve">
+        <div id="lcPlot" class="st-plot"></div>
+        <details class="st-about"><summary>About this plot</summary>Brightness over time with the spectrum taken out: each clean measurement is divided by the median of the same target in the same SPHEREx channel. A steady star sits on 1; a variable star (R Draconis, RW Aurigae) moves away from 1.</details>
+      </div>
+      <div class="tab-pane fade" id="tabMovers" role="tabpanel" data-help="movers">
+        <div class="small text-secondary mb-2">Objects moving in a straight line through at least three visits. Click one to pin it; the <b>Movers</b> layer draws its track.</div>
+        <div id="moverList" class="small"></div>
+        <hr class="my-2">
+        <div class="st-sec-title">Shift-and-add</div>
+        <details class="st-about mb-1"><summary>What it does</summary>Slide every exposure along a chosen motion before stacking (as in WiseView): an object moving that way stays still and builds up into a sharp dot, everything else smears. Use it to confirm a faint candidate.</details>
+        <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="saToggle"><label class="form-check-label" for="saToggle">Shift-and-add along this motion</label></div>
+        <div class="row g-1 mb-1 align-items-center small">
+          <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µα*</span><input id="saPmra" class="form-control" type="number" step="10" aria-label="Proper motion in RA, mas/yr"></div></div>
+          <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µδ</span><input id="saPmdec" class="form-control" type="number" step="10" aria-label="Proper motion in Dec, mas/yr"></div></div>
+          <div class="col-12 d-flex justify-content-between"><span class="text-secondary">mas/yr (1000 mas = 1″)</span><button class="btn btn-sm btn-outline-secondary py-0" id="saTarget" type="button">use the target's motion</button></div>
+        </div>
+      </div>
+      <div class="tab-pane fade" id="tabExp" role="tabpanel" data-help="exposures">
+        <div class="small text-secondary mb-1">Images in the frame on screen, with SPHEREx's quality flags at the target.</div>
+        <table class="table table-sm table-striped small mb-0">
+          <thead class="st-sticky"><tr><th>Date (UTC)</th><th>D</th><th class="hud-keepcase">λ µm</th><th>Ch</th><th>Flags at target</th><th></th></tr></thead>
+          <tbody id="expTable"></tbody>
+        </table>
+      </div>
+      <div class="tab-pane fade" id="tabAladin" role="tabpanel" data-help="aladin">
+        <select id="aladinSurvey" class="form-select form-select-sm mb-1" aria-label="Atlas background survey">
+          <option value="spherex" selected>SPHEREx DR1 all-sky map (IRSA), one channel at a time</option>
+          <option value="allwise">AllWISE colour (IRSA)</option><option value="twomass">2MASS colour (IRSA)</option><option value="dss">DSS2 colour (IRSA)</option>
+        </select>
+        <select id="atlasFrame" class="form-select form-select-sm mb-1 hud-keepcase" aria-label="SPHEREx channel shown in the atlas"></select>
+        <div id="aladinDiv" class="st-aladin"></div>
+        <div id="aladinMsg" class="small text-secondary"></div>
+        <details class="st-about"><summary>About the atlas</summary>Zoom and pan freely. Drawn with <a href="https://aladin.cds.unistra.fr/AladinLite/" target="_blank" rel="noopener">Aladin Lite</a> (CDS); images from HiPS maps hosted by NASA IRSA. The SPHEREx map combines all visits, so it cannot show motion.</details>
+      </div>
+      <div class="tab-pane fade" id="tabSettings" role="tabpanel" data-help="settings">
+        <details class="st-about mb-2"><summary>What is a visit?</summary>A group of exposures taken close together in time; SPHEREx comes back to each place about every six months. These two settings decide how exposures are grouped into the frames you blink.</details>
+        <label class="form-label small text-secondary mb-1">Start a new visit after a gap of <span id="winLabel"></span> days</label>
+        <input type="range" class="form-range" id="winRange" min="2" max="120" step="1">
+        <label class="form-label small text-secondary mb-1">…and split visits longer than <span id="spanLabel"></span> days</label>
+        <input type="range" class="form-range" id="spanRange" min="5" max="400" step="5">
+      </div>
+      <div class="tab-pane fade" id="tabShare" role="tabpanel" data-help="share">
+        <label class="form-label small text-secondary mb-1" for="shareUrl">Link to this exact view (coordinates and settings are in the URL)</label>
+        <input id="shareUrl" class="form-control form-control-sm font-monospace mb-2" readonly>
+        <div class="d-grid gap-2 st-share-grid">
+          <button class="btn btn-sm btn-outline-info" id="copyLinkBtn">Copy link</button>
+          <button class="btn btn-sm btn-outline-info" id="copyEmbedBtn">Copy embed code</button>
+          <button class="btn btn-sm btn-outline-secondary" id="copyCoordBtn">Copy centre RA/Dec</button>
+          <button class="btn btn-sm btn-outline-info" id="saveImgBtn">Save image (PNG)</button>
+          <button class="btn btn-sm btn-outline-info" id="saveCsvBtn">Download data (CSV)</button>
+          <button class="btn btn-sm btn-warning" id="reportBtn" data-bs-toggle="modal" data-bs-target="#reportModal">Report a candidate</button>
+        </div>
+        <div id="shareMsg" class="form-text small"></div>
+      </div>
+      <div class="tab-pane fade" id="tabData" role="tabpanel" data-help="data"><div class="small" id="provenance"></div></div>
+    </div>
+  </section>
+</div>
+<button class="btn btn-sm btn-outline-secondary d-none st-sheet-show" id="sheetShow" type="button" title="Show the analysis panel" aria-controls="sheet">« Analysis</button>
+
+<!-- Export side panel -->
+<div class="offcanvas offcanvas-end st-export" tabindex="-1" id="exportPanel" aria-labelledby="exportTitle">
+  <div class="offcanvas-header"><h5 class="offcanvas-title" id="exportTitle">Export this place as PDF</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div>
+  <div class="offcanvas-body small" data-help="export">
+    <div class="text-secondary mb-2" id="exportWhat"></div>
+    <div class="st-exgroup"><div class="st-sec-title">Overview</div>
+      <label><input type="checkbox" data-ex="summary" checked> Target and field (position, motion, size, data releases)</label>
+      <label><input type="checkbox" data-ex="settings" checked> Settings used and a link back to this view</label></div>
+    <div class="st-exgroup"><div class="st-sec-title">Images</div>
+      <label><input type="checkbox" data-ex="current" checked> The frame on screen</label>
+      <label><input type="checkbox" data-ex="visits" checked> One image per visit</label>
+      <label><input type="checkbox" data-ex="diff"> Difference image (last visit minus first)</label>
+      <label><input type="checkbox" data-ex="layers" checked> Draw the layers that are switched on</label>
+      <label><input type="checkbox" data-ex="channels"> 102-channel coverage strip</label></div>
+    <div class="st-exgroup"><div class="st-sec-title">Measurements</div>
+      <label><input type="checkbox" data-ex="spectrum" checked> Spectrum plot</label>
+      <label><input type="checkbox" data-ex="spectable"> Spectrum values (table of every measurement)</label>
+      <label><input type="checkbox" data-ex="lightcurve" checked> Light curve plot</label>
+      <label><input type="checkbox" data-ex="movers" checked> Moving objects found, and how they were tested</label>
+      <label><input type="checkbox" data-ex="visittable" checked> Visits (dates, number of images, wavelengths)</label>
+      <label><input type="checkbox" data-ex="exposures"> Exposure list with quality flags</label>
+      <label><input type="checkbox" data-ex="flags" checked> Quality-flag summary at the target</label></div>
+    <div class="st-exgroup"><div class="st-sec-title">Your notes and checks</div>
+      <label><input type="checkbox" data-ex="pin" checked> Pinned position with nearest catalogued stars (if pinned)</label>
+      <label class="d-block mb-1" for="exportNotes">Notes</label>
+      <textarea id="exportNotes" class="form-control form-control-sm" rows="3" maxlength="2000" placeholder="What did you find?"></textarea></div>
+    <div class="st-exgroup"><label><input type="checkbox" data-ex="sources" checked> Data sources and credits</label></div>
+    <div class="d-flex gap-2 mt-2"><button class="btn btn-sm btn-outline-secondary" type="button" id="exportAll">Select all</button><button class="btn btn-sm btn-outline-secondary" type="button" id="exportNone">Clear</button></div>
+  </div>
+  <div class="st-export-foot"><div id="exportMsg" class="small text-secondary mb-1"></div><button class="btn btn-info w-100" type="button" id="exportGo">Download PDF</button></div>
+</div>
+
+<!-- Save place modal -->
+<div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveTitle" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="saveTitle">Save this place</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body small">
+      <div class="mb-2 text-secondary" id="saveWhat"></div>
+      <label class="form-label mb-1" for="saveName">Name</label>
+      <input id="saveName" class="form-control form-control-sm mb-2" maxlength="60">
+      <label class="form-label mb-1" for="saveFolderSel">Folder</label>
+      <select id="saveFolderSel" class="form-select form-select-sm mb-2"></select>
+      <input id="saveNewFolder" class="form-control form-control-sm mb-2 d-none" maxlength="40" placeholder="New folder name">
+      <label class="form-label mb-1" for="saveNote">Note (optional)</label>
+      <textarea id="saveNote" class="form-control form-control-sm" rows="2" maxlength="300" placeholder="What is interesting here?"></textarea>
+      <div class="form-text">Saved places stay in this browser. Share a folder with its ⤴ button.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-sm btn-info" id="saveConfirm">Save</button></div>
+  </div></div>
+</div>
+
+<!-- Report modal -->
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="reportTitle">Report a candidate</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <p class="small text-secondary mb-2">Skytrace writes up what you are looking at: the link to this exact view, your pinned position, the nearest catalogued stars, and the SPHEREx exposures in the frame. Add your notes, then copy or download it to share with a teammate, a teacher, or a citizen-science community such as <a href="https://www.backyardworlds.org/" target="_blank" rel="noopener">Backyard Worlds: Planet 9</a>.</p>
+      <div class="small mb-2"><b>Before you report, check:</b>
+        <ul class="mb-0">
+          <li>It shows in <b>two or more visits</b> (step through the frames), not just one.</li>
+          <li>The pinned pixel is <b>not flagged</b> as saturated, masked or an artefact (shown in the report).</li>
+          <li>It is <b>not a known star</b>: the report lists the nearest Gaia DR3 and CatWISE2020 sources and their known motion.</li>
+          <li>For a moving dot, try <b>Shift-and-add</b> with its motion: a real mover becomes sharper.</li>
+        </ul></div>
+      <label for="reportNotes" class="form-label small mb-1">Your notes</label>
+      <textarea id="reportNotes" class="form-control form-control-sm mb-2" rows="2" placeholder="What did you see? In which frames?"></textarea>
+      <label for="reportText" class="form-label small mb-1">Report</label>
+      <textarea id="reportText" class="form-control form-control-sm font-monospace" rows="14" spellcheck="false"></textarea>
+      <div id="reportMsg" class="form-text small"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-sm btn-outline-info" id="reportCopy">Copy report</button><button class="btn btn-sm btn-info" id="reportDownload">Download .txt</button></div>
+  </div></div>
+</div>
+
+<script src="vendor/bootstrap.bundle.min.js"></script>
+<script src="vendor/plotly.min.js" charset="utf-8"></script>
+<script src="config.js"></script>
+<script src="journey.js"></script>
+<script src="sky_aladin.js"></script>
+<script src="help.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

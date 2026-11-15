@@ -24,7 +24,7 @@
   const ALIASES = {
     wise0855: ['wise0855', 'w0855', 'wisej0855', 'wise08550714', 'wisej085510'],
     barnard: ['barnard', 'barnardsstar', 'barnardstar', 'gj699', 'gl699'],
-    epsindib: ['epsindib', 'epsilonindib', 'epsind', 'epsilonindi', 'epsiloninds', 'epsiloninb'],
+    epsindib: ['epsindib', 'epsilonindib', 'epsindb', 'epsind', 'epsilonindi', 'epsiloninds', 'epsiloninb'],
     rwaur: ['rwaur', 'rwaurigae'],
     rdra: ['rdra', 'rdraconis'],
     m101: ['m101', 'ngc5457', 'pinwheel'],
@@ -47,7 +47,7 @@
   let LIMITS = null;            // display limits cache
   let RENDER_CACHE = new Map();
   let PIN = null;               // {ra, dec, label}
-  let MOVERS = [];
+  let MOVERS = [], MOVER_INFO = null;
   let playTimer = null;
   let suppressUrl = false;
   const LIVE_URL = (window.SKYTRACE_LIVE_URL || '').trim();
@@ -193,6 +193,7 @@
   }
   function shareUrl() {
     let base = PUBLIC_BASE;
+    if (base && base.endsWith('/')) base += 'app.html';   // the site root is the welcome page; links open the dashboard
     if (!base) base = (location.origin && location.origin !== 'null') ? location.origin + location.pathname : '';
     return base + '?' + stateParams().toString();
   }
@@ -254,18 +255,117 @@
     $('modeBadge').textContent = LIVE ? 'Live IRSA archive' : 'Pre-built demo fields';
     $('modeBadge').className = 'badge ' + (LIVE ? 'text-bg-success' : 'text-bg-secondary');
     if (!LIVE && LIVE_URL) { const l = $('liveLink'); l.href = LIVE_URL; l.classList.remove('d-none'); }
-    if (window.SkyJourney) SkyJourney.setFields(INDEX.fields);
+    if (window.SkyJourney) SkyJourney.setFields(INDEX.fields.map((f) => ({ ...f, user: !FIELD_DEFAULTS[f.key] })));
     const hint = $('skyClickHint'); if (hint) hint.textContent = LIVE ? 'Click the map to search there.' : 'Click the map to pick coordinates (searching new positions needs the live server).';
-    const box = $('targetButtons'); box.innerHTML = '';
-    for (const f of INDEX.fields) {
-      const b = document.createElement('button');
-      b.className = 'btn btn-sm btn-outline-secondary'; b.textContent = f.name; b.dataset.key = f.key;
-      b.title = `${f.n} SPHEREx exposures`;
-      b.onclick = () => openField(f.key, true);
-      box.appendChild(b);
-    }
+    renderLibrary();
   }
 
+  // ---------------------------------------------------------------- saved places (bookmarks in named folders)
+  // Like saved lists in a map app: places (a whole field, or a pinned spot in it) go into folders the visitor names.
+  // Everything is stored in this browser; a folder is shared as a link that carries the list itself (no server).
+  function savedLoad() {
+    try { const d = JSON.parse(localStorage.getItem('skytrace-saved') || 'null'); if (d && Array.isArray(d.folders)) return d; } catch (e) { /* storage off */ }
+    return { folders: [{ id: 'f' + Date.now().toString(36), name: 'My places', items: [] }] };
+  }
+  function savedStore(d) { try { localStorage.setItem('skytrace-saved', JSON.stringify(d)); } catch (e) { /* storage off */ } }
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  function renderSaved() {
+    const box = $('libSaved'); if (!box) return;
+    const d = savedLoad(); let n = 0;
+    box.innerHTML = d.folders.map((f) => { n += f.items.length; return `<details class="st-subfolder" open data-folder="${f.id}"><summary><span class="st-item-name">📁 ${escapeHtml(f.name)}</span> <span class="st-count">${f.items.length}</span>
+        <span class="st-item-tools ms-auto"><button class="btn btn-sm py-0 px-1" type="button" data-fshare="${f.id}" title="Copy a link that shares this folder" aria-label="Share folder ${escapeHtml(f.name)}">⤴</button><button class="btn btn-sm py-0 px-1" type="button" data-frename="${f.id}" title="Rename folder" aria-label="Rename folder ${escapeHtml(f.name)}">✎</button><button class="btn btn-sm py-0 px-1" type="button" data-fdelete="${f.id}" title="Delete folder" aria-label="Delete folder ${escapeHtml(f.name)}">✕</button></span></summary>
+      <ul class="st-list">${f.items.map((it) => `<li><button class="st-item${PIN && it.pin && F && F.meta.key === it.field && Math.abs(PIN.ra - it.ra) < 1e-5 ? ' active' : ''}" type="button" data-open="${f.id}:${it.id}" title="${escapeHtml(it.note || '')}"><span class="st-item-name">${it.pin ? '📍 ' : ''}${escapeHtml(it.name)}</span><span class="st-item-meta">${it.ra.toFixed(4)} ${it.dec >= 0 ? '+' : ''}${it.dec.toFixed(4)}${it.note ? ' · ' + escapeHtml(it.note.slice(0, 40)) : ''}</span></button>
+        <span class="st-item-tools"><button class="btn btn-sm py-0 px-1" type="button" data-imove="${f.id}:${it.id}" title="Move to another folder" aria-label="Move ${escapeHtml(it.name)}">⇄</button><button class="btn btn-sm py-0 px-1" type="button" data-irename="${f.id}:${it.id}" title="Rename" aria-label="Rename ${escapeHtml(it.name)}">✎</button><button class="btn btn-sm py-0 px-1" type="button" data-idelete="${f.id}:${it.id}" title="Remove" aria-label="Remove ${escapeHtml(it.name)}">✕</button></span></li>`).join('') || '<li class="small text-secondary px-3 py-1">Empty: use ☆ Save this place.</li>'}</ul></details>`; }).join('');
+    $('libCountSaved').textContent = n;
+    const find = (key) => { const [fid, iid] = key.split(':'); const dd = savedLoad(); const f = dd.folders.find((x) => x.id === fid); return { dd, f, it: f && f.items.find((x) => x.id === iid) }; };
+    box.querySelectorAll('[data-open]').forEach((b) => { b.onclick = () => { const { it } = find(b.dataset.open); if (it) openSaved(it); }; });
+    box.querySelectorAll('[data-irename]').forEach((b) => { b.onclick = () => { const { dd, it } = find(b.dataset.irename); const v = it && prompt('Name:', it.name); if (v && v.trim()) { it.name = v.trim().slice(0, 60); savedStore(dd); renderSaved(); } }; });
+    box.querySelectorAll('[data-idelete]').forEach((b) => { b.onclick = () => { const { dd, f, it } = find(b.dataset.idelete); if (it && confirmBox(`Remove "${it.name}"?`)) { f.items = f.items.filter((x) => x !== it); savedStore(dd); renderSaved(); } }; });
+    box.querySelectorAll('[data-imove]').forEach((b) => { b.onclick = () => { const { dd, f, it } = find(b.dataset.imove); if (!it) return;
+      const names = dd.folders.map((x, k) => `${k + 1}: ${x.name}`).join('\n'); const k = parseInt(prompt(`Move "${it.name}" to which folder?\n${names}`, '1'), 10) - 1;
+      const to = dd.folders[k]; if (to && to !== f) { f.items = f.items.filter((x) => x !== it); to.items.push(it); savedStore(dd); renderSaved(); } }; });
+    box.querySelectorAll('[data-frename]').forEach((b) => { b.onclick = (e) => { e.preventDefault(); const dd = savedLoad(); const f = dd.folders.find((x) => x.id === b.dataset.frename); const v = f && prompt('Folder name:', f.name); if (v && v.trim()) { f.name = v.trim().slice(0, 40); savedStore(dd); renderSaved(); } }; });
+    box.querySelectorAll('[data-fdelete]').forEach((b) => { b.onclick = (e) => { e.preventDefault(); const dd = savedLoad(); const f = dd.folders.find((x) => x.id === b.dataset.fdelete);
+      if (f && confirmBox(`Delete folder "${f.name}" and its ${f.items.length} places?`)) { dd.folders = dd.folders.filter((x) => x !== f); if (!dd.folders.length) dd.folders.push({ id: 'f' + uid(), name: 'My places', items: [] }); savedStore(dd); renderSaved(); } }; });
+    box.querySelectorAll('[data-fshare]').forEach((b) => { b.onclick = (e) => { e.preventDefault(); const f = savedLoad().folders.find((x) => x.id === b.dataset.fshare); if (f) copyText(folderLink(f), $('coordMsg'), `Link to the folder "${f.name}" copied.`); }; });
+  }
+  function confirmBox(q) { return window.confirm(q); }
+  function b64url(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function unb64url(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
+  function folderLink(f) {
+    const data = { n: f.name, i: f.items.map((it) => [it.name, +it.ra.toFixed(6), +it.dec.toFixed(6), it.field || '', it.pin ? 1 : 0, it.note || '']) };
+    const u = new URL(location.href); u.search = ''; u.hash = ''; u.searchParams.set('folder', b64url(JSON.stringify(data))); return u.toString();
+  }
+  function importFolder(param) {
+    try {
+      const data = JSON.parse(unb64url(param)); if (!data || !Array.isArray(data.i)) throw new Error('bad');
+      const dd = savedLoad(); const f = { id: 'f' + uid(), name: String(data.n || 'Shared folder').slice(0, 40) + ' (shared)', items: [] };
+      for (const r of data.i.slice(0, 200)) { const [name, ra, dec, field, pin, note] = r; if (!isFinite(ra) || !isFinite(dec) || ra < 0 || ra >= 360 || Math.abs(dec) > 90) continue;
+        f.items.push({ id: uid(), name: String(name || 'Place').slice(0, 60), ra: +ra, dec: +dec, field: /^[a-z0-9_]{1,40}$/i.test(field || '') ? field : '', pin: !!pin, note: String(note || '').slice(0, 300) }); }
+      dd.folders.push(f); savedStore(dd); renderSaved(); $('savedFolder').open = true;
+      setMsg($('coordMsg'), `Added the shared folder "${f.name}" (${f.items.length} places) to Saved places.`, 'success');
+    } catch (e) { setMsg($('coordMsg'), 'That folder link could not be read.', 'warning'); }
+  }
+  async function openSaved(it) {
+    const f = it.field && INDEX.fields.find((x) => x.key === it.field);
+    if (f) { if (!F || F.meta.key !== f.key) await openField(f.key, true); if (it.pin) setPin(it.ra, it.dec); renderSaved(); return; }
+    // the field is not on this server (shared by someone else, or the server was restarted): search the position
+    $('coordInput').value = `${it.ra.toFixed(5)} ${it.dec.toFixed(5)}`; await onGo(); if (it.pin && F) setPin(it.ra, it.dec);
+  }
+  function openSaveModal() {
+    if (!F) return;
+    const dd = savedLoad(), pin = PIN, [cra, cdec] = F.meta.grid.crval;
+    $('saveWhat').textContent = pin ? `The pinned spot ${raToHms(pin.ra)} ${decToDms(pin.dec)} in ${displayName(F.meta.key, F.meta.name)}.` : `The whole field ${displayName(F.meta.key, F.meta.name)} (centre ${raToHms(cra)} ${decToDms(cdec)}). Tip: click the image first to save one spot instead.`;
+    $('saveName').value = pin ? `Spot in ${displayName(F.meta.key, F.meta.name)}` : displayName(F.meta.key, F.meta.name);
+    $('saveFolderSel').innerHTML = dd.folders.map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join('') + '<option value="__new">+ New folder…</option>';
+    $('saveNewFolder').classList.add('d-none'); $('saveNewFolder').value = ''; $('saveNote').value = '';
+    $('saveFolderSel').onchange = () => $('saveNewFolder').classList.toggle('d-none', $('saveFolderSel').value !== '__new');
+    $('saveConfirm').onclick = () => {
+      const d2 = savedLoad(); let f = d2.folders.find((x) => x.id === $('saveFolderSel').value);
+      if (!f) { const nm = ($('saveNewFolder').value || '').trim(); if (!nm) { $('saveNewFolder').classList.remove('d-none'); $('saveNewFolder').focus(); return; } f = { id: 'f' + uid(), name: nm.slice(0, 40), items: [] }; d2.folders.push(f); }
+      f.items.push({ id: uid(), name: ($('saveName').value || 'Place').trim().slice(0, 60), ra: pin ? pin.ra : cra, dec: pin ? pin.dec : cdec, field: F.meta.key, pin: !!pin, note: ($('saveNote').value || '').trim().slice(0, 300) });
+      savedStore(d2); renderSaved(); $('savedFolder').open = true; bootstrap.Modal.getOrCreateInstance($('saveModal')).hide();
+      setMsg($('coordMsg'), `Saved to "${f.name}".`, 'success'); setTimeout(() => { if ($('coordMsg').textContent.startsWith('Saved to')) $('coordMsg').textContent = ''; }, 3000);
+    };
+    bootstrap.Modal.getOrCreateInstance($('saveModal')).show();
+  }
+
+  // ---------------------------------------------------------------- library (left panel)
+  // Three folders, like bookmarks: the challenge's pre-built targets, the fastest-moving Gaia DR3 stars, and the
+  // places this visitor searched (remembered in this browser only, with the names they give them).
+  function mine() { try { return JSON.parse(localStorage.getItem('skytrace-mine') || '[]'); } catch (e) { return []; } }
+  function saveMine(list) { try { localStorage.setItem('skytrace-mine', JSON.stringify(list.slice(0, 60))); } catch (e) { /* storage off */ } }
+  function addMine(key) { if (FIELD_DEFAULTS[key]) return; saveMine([key, ...mine().filter((k) => k !== key)]); }
+  function libItem(f, extra) {
+    const active = F && F.meta.key === f.key ? ' active' : '';
+    return `<li><button class="st-item${active}" type="button" data-key="${escapeHtml(f.key)}" title="${escapeHtml(f.name)}"><span class="st-item-name">${escapeHtml(displayName(f.key, f.name))}</span><span class="st-item-meta">${f.n} exposures</span></button>${extra || ''}</li>`;
+  }
+  function renderLibrary() {
+    if (!$('libTargets')) return;
+    const fields = INDEX.fields || [];
+    const targets = fields.filter((f) => FIELD_DEFAULTS[f.key]);
+    $('libTargets').innerHTML = targets.map((f) => libItem(f)).join(''); $('libCountTargets').textContent = targets.length;
+    const own = mine().map((k) => fields.find((f) => f.key === k)).filter(Boolean);
+    $('libMine').innerHTML = own.map((f) => libItem(f, `<span class="st-item-tools"><button class="btn btn-sm py-0 px-1" type="button" data-rename="${escapeHtml(f.key)}" title="Rename" aria-label="Rename ${escapeHtml(displayName(f.key, f.name))}">✎</button><button class="btn btn-sm py-0 px-1" type="button" data-forget="${escapeHtml(f.key)}" title="Remove from your list" aria-label="Remove ${escapeHtml(displayName(f.key, f.name))} from your list">✕</button></span>`)).join('');
+    $('libCountMine').textContent = own.length; $('libMineEmpty').classList.toggle('d-none', own.length > 0);
+    document.querySelectorAll('.st-folders .st-item[data-key]').forEach((b) => { b.onclick = () => openField(b.dataset.key, true); });
+    document.querySelectorAll('[data-rename]').forEach((b) => { b.onclick = () => {
+      const k = b.dataset.rename, f = fields.find((x) => x.key === k); const name = prompt('Name for this place (kept in this browser):', displayName(k, f ? f.name : ''));
+      if (name && name.trim()) { setLocalName(k, name.trim().slice(0, 40)); renderLibrary(); if (F && F.meta.key === k) $('fieldTitle').textContent = displayName(k, F.meta.name); } }; });
+    document.querySelectorAll('[data-forget]').forEach((b) => { b.onclick = () => { saveMine(mine().filter((k) => k !== b.dataset.forget)); renderLibrary(); }; });
+    renderFast(); renderSaved();
+  }
+  function renderFast() {
+    if (!$('libFast') || !EXPLORE) return;
+    $('libFast').innerHTML = EXPLORE.map((st, k) => `<li><button class="st-item" type="button" data-fast="${k}" title="Gaia DR3 ${st.id}"><span class="st-item-name">${st.pm.toFixed(2)}″/yr${st.dist_pc ? ' · ' + st.dist_pc.toFixed(1) + ' pc' : ''}</span><span class="st-item-meta">Gaia DR3 ${st.id} · G ${st.g}</span></button></li>`).join('');
+    $('libCountFast').textContent = EXPLORE.length;
+    $('libFast').querySelectorAll('[data-fast]').forEach((b) => { b.onclick = () => openExplore(+b.dataset.fast); });
+  }
+
+  // Names a visitor gives to their own searches live only in their browser (never sent to the shared server list).
+  function localNames() { try { return JSON.parse(localStorage.getItem('skytrace-names') || '{}'); } catch (e) { return {}; } }
+  function setLocalName(key, name) { try { const n = localNames(); n[key] = name; localStorage.setItem('skytrace-names', JSON.stringify(n)); } catch (e) { /* storage off */ } }
+  function displayName(key, fallback) { return localNames()[key] || fallback; }
   function veil(on, text) { $('loadingVeil').classList.toggle('d-none', !on); if (text) $('loadingText').textContent = text;} 
 
   async function openField(key, resetView) {
@@ -286,17 +386,18 @@
       if (resetView) {
         const keep = { speed: S.speed, stretch: S.stretch, cmap: S.cmap === 'div' ? 'gray' : S.cmap };
         Object.assign(S, DEFAULTS, keep, FIELD_DEFAULTS[key] || {});
+        S.fov = +(np * PIX / 60).toFixed(1);
         S.sapmra = Math.round(meta.target.pmra || 0); S.sapmdec = Math.round(meta.target.pmdec || 0);
         clearPin();
       }
       $('hoverReadout').textContent = 'Move over the image to read RA, Dec and brightness.';
-      document.querySelectorAll('#targetButtons button').forEach((b) => b.classList.toggle('active', b.dataset.key === key));
-      $('fieldTitle').textContent = meta.name;
+      document.querySelectorAll('.st-folders .st-item[data-key]').forEach((b) => b.classList.toggle('active', b.dataset.key === key));
+      $('fieldTitle').textContent = displayName(meta.key, meta.name);
       if ($('hudTarget')) { $('hudTarget').textContent = meta.name; $('hudCoord').textContent = `${meta.grid.crval[0].toFixed(3)} ${meta.grid.crval[1] >= 0 ? '+' : ''}${meta.grid.crval[1].toFixed(3)}`; }
-      $('fieldNote').textContent = meta.note || '';
+      $('fieldNote').textContent = meta.note || ''; $('noteBtn').title = meta.note || '';
       renderBlendNote();
       groupVisits(); syncControls(); rebuild(); renderProvenance(); drawSpectrum(); drawLightCurve();
-      if (window.SkyAladin) SkyAladin.update(meta);
+      if (window.SkyAladin) { SkyAladin.update(meta); if (currentSource() !== 'spherex') refreshSource(); }
       let landed = Promise.resolve();
       if (window.SkyJourney) { landed = SkyJourney.travel(meta.grid.crval[0], meta.grid.crval[1], false); SkyJourney.arrive(); }
       if ($('skyHere')) $('skyHere').textContent = `${raToHms(meta.grid.crval[0]).slice(0, 8)} ${decToDms(meta.grid.crval[1]).slice(0, 9)}`;
@@ -620,7 +721,9 @@
     $('frameSub').textContent = fr.sub;
     $('frameRange').value = k;
     document.querySelectorAll('#filmstrip button').forEach((b, i) => b.classList.toggle('active', i === k));
-    const act = document.querySelector('#filmstrip button.active'); if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const act = document.querySelector('#filmstrip button.active'), fs = $('filmstrip');
+    // keep the active visit button visible by scrolling the strip sideways only (scrollIntoView would also scroll the page)
+    if (act && fs) { const l = act.offsetLeft - fs.offsetLeft, r = l + act.offsetWidth; if (l < fs.scrollLeft) fs.scrollLeft = l; else if (r > fs.scrollLeft + fs.clientWidth) fs.scrollLeft = r - fs.clientWidth; }
     renderLegend(fr); drawOverlay(); renderExposureTable(fr); highlightSpectrum(fr);
     if (S.mode === 'scan') drawBandStrip();
   }
@@ -721,6 +824,8 @@
     }
     if (ovOn('movers')) {
       MOVERS.forEach((m, i) => {
+        ctx.fillStyle = 'rgba(255,99,255,0.95)';
+        for (const [tx, ty] of m.track) { const [sx, sy] = g.toScreen(tx, ty); ctx.beginPath(); ctx.arc(sx, sy, 2 * g.dpr, 0, 2 * Math.PI); ctx.fill(); }
         const [x1, y1] = g.toScreen(m.px, m.py), [x2, y2] = g.toScreen(m.nx, m.ny);
         arrow(ctx, x1, y1, x2, y2, 'rgba(255,99,255,0.95)', g.dpr);
         ctx.fillStyle = 'rgba(255,99,255,0.95)'; ctx.font = `${11 * g.dpr}px system-ui`; ctx.fillText(`M${i + 1}`, x2 + 5 * g.dpr, y2 - 5 * g.dpr);
@@ -772,7 +877,7 @@
       const [sra, sde] = apparent(st.ra, st.dec, st.pmra, st.pmdec, st.plx, 57388.0, fr.mjd, fr.earth); const [x, y] = world2pix(sra, sde);
       const dd = Math.hypot(x - gx, y - gy); if (dd < best) { best = dd; near = `Gaia DR3 ${st.id}  G=${st.g}  PM ${fmt(Math.hypot(st.pmra, st.pmdec) / 1000, 2)}″/yr`; }
     }
-    $('hoverReadout').innerHTML = `RA ${ra.toFixed(5)}°  Dec ${dec.toFixed(5)}°<br>${raToHms(ra)} ${decToDms(dec)}<br>${fr.isDiff ? 'Δ ' : ''}${val} MJy/sr ${fr.isDiff ? 'difference' : 'above local sky'}${fr.members && fr.members.length > 1 ? ` (mean of ${fr.members.length} exposures, ${waveRange(fr.members)})` : ''}${flags ? ' · ' + flags : ''}${near ? '<br><span class="text-info">' + near + '</span>' : ''}`;
+    $('hoverReadout').innerHTML = `RA ${ra.toFixed(5)}°  Dec ${dec.toFixed(5)}°<br>${raToHms(ra)} ${decToDms(dec)}<br>${fr.isDiff ? 'Δ ' : ''}${val} MJy/sr ${fr.isDiff ? `difference (${fr.label.replace(/\s*\(.*$/, '')}; ${fr.sub || ''})` : `above local sky${fr.members && fr.members.length > 1 ? ` (mean of ${fr.members.length} exposures, ${waveRange(fr.members)})` : ''}`}${flags ? ' · ' + flags : ''}${near ? '<br><span class="text-info">' + near + '</span>' : ''}`;
   }
   function onClick(ev) {
     if (!F) return;
@@ -905,60 +1010,185 @@
   }
 
 
-  // ---------------------------------------------------------------- movers (experimental)
-  const MOVER_SIGMA = 6;
-  function lobeCentroid(D, n, x, y, sign, med) {
-    let sx = 0, sy = 0, sw = 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const v = sign * (D[(y + dy) * n + x + dx] - med); if (v > 0) { sx += v * (x + dx); sy += v * (y + dy); sw += v; }
+  // ---------------------------------------------------------------- moving-object finder
+  // Multi-visit straight-line motion test. Same steps, constants and order as the Python reference
+  // tests/movers_ref.py (checked against it field by field, tests/movers_parity.py, and by injecting fake
+  // moving and still sources into the real exposures, tests/movers_inject.py):
+  //  1. one stack per visit (detector-balanced, background flattened), as the visit frames;
+  //  2. sources = 3x3 maxima of the stack smoothed with a sigma = 1 px Gaussian, S/N >= 3.5 (seeds need >= 5);
+  //     nothing within 2 px of a flagged pixel, 4 px of a saturated pixel, or 3 px of the edge;
+  //  3. Gaussian-weighted centroids; visits registered to each other and position errors measured on Gaia DR3
+  //     stars that cannot move measurably (sigma_pos^2 = a^2 + b^2 / SNR^2, fitted on this field);
+  //  4. link sources across visits along straight lines (still stars are the v = 0 case), best tracks first;
+  //  5. report a track only if it is seen in >= 3 visits and >= 2/3 of the visits covering it, the line fits
+  //     (chi2/dof < 4), the motion is >= 5 sigma and >= 0.5 px in total, the flux changes < x3, and no other
+  //     source sits within 2 px (blends shift centroids between visits).
+  const MV = { VMAX: 30, SEED: 5, CONFIRM: 3.5, SIG: 5, STILL: 3, SHIFT: 0.5, CHI2: 4 };
+  function gauss1(img, n) {
+    const k = []; for (let i = -4; i <= 4; i++) k.push(Math.exp(-i * i / 2)); const ks = k.reduce((a, b) => a + b, 0); for (let i = 0; i < 9; i++) k[i] /= ks;
+    const tmp = new Float64Array(n * n), out = new Float64Array(n * n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { let s = 0; for (let i = -4; i <= 4; i++) { const xx = x + i; if (xx >= 0 && xx < n) s += k[i + 4] * img[y * n + xx]; } tmp[y * n + x] = s; }
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { let s = 0; for (let i = -4; i <= 4; i++) { const yy = y + i; if (yy >= 0 && yy < n) s += k[i + 4] * tmp[yy * n + x]; } out[y * n + x] = s; }
+    return out;
+  }
+  function madStats(arr) { const v = Array.from(arr).sort((a, b) => a - b); const med = percentile(v, 50); const d = v.map((q) => Math.abs(q - med)).sort((a, b) => a - b); return [med, 1.4826 * percentile(d, 50)]; }
+  function detectSources(img, cat, n) {
+    const z = new Float64Array(n * n), finite = [];
+    for (let p = 0; p < n * n; p++) { const v = img[p]; z[p] = v === v ? v : 0; }
+    const sm = gauss1(z, n);
+    for (let p = 0; p < n * n; p++) if (img[p] === img[p]) finite.push(sm[p]);
+    const [med, sig] = madStats(finite);
+    const near = (x, y, r, mask) => { for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < n && yy < n && (cat[yy * n + xx] & mask)) return true; } return false; };
+    const out = [];
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const p = y * n + x, snr = (sm[p] - med) / sig; if (!(snr >= MV.CONFIRM)) continue;
+      let isMax = true;
+      for (let dy = -1; dy <= 1 && isMax; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = Math.min(n - 1, Math.max(0, x + dx)), yy = Math.min(n - 1, Math.max(0, y + dy)); if (sm[yy * n + xx] > sm[p]) { isMax = false; break; } }
+      if (!isMax) continue;
+      if (x < 3 || y < 3 || x > n - 4 || y > n - 4 || near(x, y, 2, CAT_SAT | CAT_ART | CAT_BAD) || near(x, y, 4, CAT_SAT)) continue;
+      let cx = x, cy = y;
+      for (let it = 0; it < 4; it++) {
+        const ix = Math.round(cx), iy = Math.round(cy); if (ix < 3 || iy < 3 || ix > n - 4 || iy > n - 4) break;
+        let s = 0, sx = 0, sy = 0;
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+          const xx = ix + dx, yy = iy + dy, wgt = Math.max(0, z[yy * n + xx] * Math.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * 1.44)));
+          s += wgt; sx += wgt * xx; sy += wgt * yy;
+        }
+        if (s <= 0) break; cx = sx / s; cy = sy / s;
+      }
+      let flux = 0; for (let yy = 0; yy < n; yy++) for (let xx = 0; xx < n; xx++) if ((xx - cx) ** 2 + (yy - cy) ** 2 <= 4) flux += z[yy * n + xx];
+      out.push({ x: cx, y: cy, snr, flux });
     }
-    return sw > 0 ? [sx / sw, sy / sw] : [x, y];
+    return out;
   }
   function computeMovers() {
-    MOVERS = [];
+    MOVERS = []; MOVER_INFO = null;
     const box = $('moverList');
-    if (!F || VISITS.length < 2) { box.innerHTML = '<div class="text-secondary">Needs at least two visits.</div>'; return; }
+    if (!F || VISITS.length < 3) { box.innerHTML = '<div class="text-secondary">Motion can only be tested with at least three visits (two points always fit a straight line). This field has ' + (F ? VISITS.length : 0) + '.</div>'; if (ovOn('movers')) drawOverlay(); return; }
     const pick = (v) => v.idx.filter(S.det === 'rgb' ? () => true : detFilter);
-    const vis = VISITS.filter((v) => pick(v).length);
-    if (vis.length < 2) { box.innerHTML = '<div class="text-secondary">Needs at least two visits with data.</div>'; return; }
-    const A = balancedCoadd(pick(vis[0])), B = balancedCoadd(pick(vis[vis.length - 1])), n = F.np, D = new Float32Array(n * n), dt = (meanMjd(pick(vis[vis.length - 1])) - meanMjd(pick(vis[0]))) / 365.25;
-    const vals = [];
-    for (let p = 0; p < n * n; p++) { D[p] = A.img[p] - B.img[p]; if (D[p] === D[p]) vals.push(D[p]); }
-    vals.sort((a, b) => a - b); const med = percentile(vals, 50);
-    const mad = vals.map((v) => Math.abs(v - med)).sort((a, b) => a - b); const sig = 1.4826 * percentile(mad, 50) || 1e-9;
-    const peaks = [];
-    for (let y = 2; y < n - 2; y++) for (let x = 2; x < n - 2; x++) {
-      const p = y * n + x, v = D[p]; if (!(Math.abs(v - med) > MOVER_SIGMA * sig)) continue;
-      if ((A.cat[p] | B.cat[p]) & CAT_SAT) continue;
-      let ext = true;
-      for (let dy = -1; dy <= 1 && ext; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const q = D[p + dy * n + dx]; if (q === q && (v > 0 ? q > v : q < v)) { ext = false; break; } }
-      if (ext) peaks.push({ x, y, v, snr: (v - med) / sig });
+    const vis = VISITS.map(pick).filter((m) => m.length);
+    if (vis.length < 3) { box.innerHTML = '<div class="text-secondary">Needs at least three visits with data for this detector choice.</div>'; return; }
+    const n = F.np, t = vis.map(meanMjd), E = vis.map(meanEarth), ex = F.meta.exposures;
+    const stacks = vis.map((m) => { const c = balancedCoadd(m); flattenPlane(c.img); return c; });
+    const D = stacks.map((c) => detectSources(c.img, c.cat, n));
+    const base = (t[t.length - 1] - t[0]) / 365.25;
+    const gaia = F.meta.catalogs.gaia || [];
+    const gpos = (s, k) => world2pix(...apparent(s.ra, s.dec, s.pmra || 0, s.pmdec || 0, s.plx || 0, 57388.0, t[k], E[k]));
+    // 3. registration and error model from Gaia stars that do not move measurably over the baseline
+    const still = gaia.filter((s) => Math.hypot(s.pmra || 0, s.pmdec || 0) / 1000 * Math.max(base, 0.1) / PIX < 0.05 && (s.plx || 0) < 20);
+    const match = [];
+    for (const s of still) D.forEach((dk, k) => {
+      const [gx, gy] = gpos(s, k); let best = null, bd = Infinity;
+      for (const d of dk) { const q = (d.x - gx) ** 2 + (d.y - gy) ** 2; if (q < bd) { bd = q; best = d; } }
+      if (best && best.snr >= MV.SEED && Math.sqrt(bd) < 1) match.push([k, best.x - gx, best.y - gy, best.snr]);
+    });
+    const off = D.map((_, k) => { const r = match.filter((q) => q[0] === k && q[3] >= 15); if (r.length < 5) return [0, 0];
+      return [percentile(r.map((q) => q[1]).sort((a, b) => a - b), 50), percentile(r.map((q) => q[2]).sort((a, b) => a - b), 50)]; });
+    D.forEach((dk, k) => dk.forEach((d) => { d.x -= off[k][0]; d.y -= off[k][1]; }));
+    let A = 0.10, B = 1.0;
+    if (match.length >= 30) {
+      const r = match.map(([k, dx, dy, sn]) => [dx - off[k][0], dy - off[k][1], sn]);
+      const sn = r.map((q) => q[2]).sort((a, b) => a - b);
+      const edges = [...new Set([0, 20, 40, 60, 80, 100].map((p) => percentile(sn, p)))].sort((a, b) => a - b);
+      const xs = [], ys = [];
+      for (let e = 0; e + 1 < edges.length; e++) {
+        const q = r.filter((v) => v[2] >= edges[e] && v[2] <= edges[e + 1]); if (q.length < 6) continue;
+        const abs = q.flatMap((v) => [Math.abs(v[0]), Math.abs(v[1])]).sort((a, b) => a - b);
+        const sig = 1.4826 * percentile(abs, 50), msn = percentile(q.map((v) => v[2]).sort((a, b) => a - b), 50);
+        xs.push(1 / msn ** 2); ys.push(sig ** 2);
+      }
+      if (xs.length >= 3) {
+        const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+        let sxy = 0, sxx = 0; for (let i = 0; i < xs.length; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
+        const slope = sxy / sxx, icpt = my - slope * mx;
+        A = Math.sqrt(Math.max(icpt, 0.03 ** 2)); B = Math.sqrt(Math.max(slope, 0.3 ** 2));
+      }
     }
-    const pos = peaks.filter((q) => q.snr > 0), neg = peaks.filter((q) => q.snr < 0);
-    const stationary = F.meta.catalogs.gaia.filter((s) => Math.hypot(s.pmra, s.pmdec) < 100).map((s) => world2pix(...propagate(s.ra, s.dec, s.pmra, s.pmdec, 57388.0, F.meta.grid.mjd_ref)));
-    const nearStatic = (x, y) => stationary.some(([sx, sy]) => Math.hypot(sx - x, sy - y) < 1.6);
-    const used = new Set();
-    for (const a of pos.sort((p, q) => q.snr - p.snr)) {
-      let best = null, bd = 6.5;
-      neg.forEach((b, j) => { if (used.has(j)) return; const d = Math.hypot(a.x - b.x, a.y - b.y); if (d >= 0.7 && d < bd) { bd = d; best = j; } });
-      if (best === null) continue;
-      const b = neg[best], ratio = a.snr / -b.snr;
-      if (ratio < 0.33 || ratio > 3) continue;           // a moving point source leaves a roughly symmetric +/- pair
-      if (nearStatic(a.x, a.y) && nearStatic(b.x, b.y)) continue;
-      used.add(best);
-      const [ax, ay] = lobeCentroid(D, n, a.x, a.y, 1, med), [bx, by] = lobeCentroid(D, n, b.x, b.y, -1, med);
-      const [ra1, de1] = pix2world(ax, ay), [ra2, de2] = pix2world(bx, by);
-      const pm = angSepDeg(ra1, de1, ra2, de2) * 3600 / Math.max(dt, 1e-3);
-      MOVERS.push({ px: ax, py: ay, nx: bx, ny: by, snr: Math.min(a.snr, -b.snr), ra: ra2, dec: de2, pm });
-      if (MOVERS.length >= 10) break;
+    D.forEach((dk, k) => dk.forEach((d) => { d.k = k; d.s = Math.hypot(A, B / d.snr); }));
+    // 4. link along straight lines
+    const vmax = MV.VMAX / PIX / 365.25, tracks = [];
+    const fit = (P, tt, W) => {
+      const tm = tt.reduce((a, b) => a + b, 0) / tt.length; let sw = 0, swt = 0, swtt = 0, sx = 0, sxt = 0, sy = 0, syt = 0;
+      P.forEach((p, q) => { const w = W[q], d = tt[q] - tm; sw += w; swt += w * d; swtt += w * d * d; sx += w * p.x; sxt += w * p.x * d; sy += w * p.y; syt += w * p.y * d; });
+      const det = sw * swtt - swt * swt, bx = (sw * sxt - swt * sx) / det, ax = (sx - bx * swt) / sw, by = (sw * syt - swt * sy) / det, ay = (sy - by * swt) / sw;
+      let chil = 0, chi0 = 0; const mx = sx / sw, my = sy / sw;
+      P.forEach((p, q) => { const d = tt[q] - tm; chil += ((p.x - ax - bx * d) ** 2 + (p.y - ay - by * d) ** 2) / p.s ** 2; chi0 += ((p.x - mx) ** 2 + (p.y - my) ** 2) / p.s ** 2; });
+      return { ax, ay, bx, by, chil, chi0, tm, sv: 1 / Math.sqrt(P.reduce((acc, p, q) => acc + W[q] * (tt[q] - tm) ** 2, 0)) };
+    };
+    for (let i = 0; i < D.length; i++) for (let j = i + 1; j < D.length; j++) {
+      const dt = t[j] - t[i];
+      D[i].forEach((a, ja) => { if (a.snr < MV.SEED) return;
+        D[j].forEach((b, jb) => { if (b.snr < MV.SEED) return;
+          if (Math.hypot(b.x - a.x, b.y - a.y) > vmax * dt + 3 * Math.hypot(a.s, b.s)) return;
+          if (Math.max(a.flux, b.flux) > 3 * Math.max(Math.min(a.flux, b.flux), 1e-9)) return;
+          const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt, pts = [[i, ja, a], [j, jb, b]]; let covered = 2;
+          for (let k = 0; k < D.length; k++) {
+            if (k === i || k === j) continue;
+            const px = a.x + vx * (t[k] - t[i]), py = a.y + vy * (t[k] - t[i]);
+            if (!(px >= 3 && px <= n - 4 && py >= 3 && py <= n - 4)) continue;
+            covered++; let best = null, bd = Infinity;
+            D[k].forEach((e, jj) => { const d = Math.hypot(e.x - px, e.y - py); if (d < 3 * Math.hypot(e.s, a.s, b.s) && d < bd) { bd = d; best = [k, jj, e]; } });
+            if (best) pts.push(best);
+          }
+          if (pts.length < 3) return;
+          const P = pts.map((p) => p[2]), tt = pts.map((p) => t[p[0]]), W = P.map((p) => 1 / p.s ** 2), f = fit(P, tt, W);
+          const dof = 2 * P.length - 4, fl = P.map((p) => p.flux);
+          tracks.push({ pts: pts.map((p) => [p[0], p[1]]), n: P.length, covered, sig: Math.sqrt(Math.max(f.chi0 - f.chil, 0)), chi: f.chil / Math.max(dof, 1),
+            vx: f.bx, vy: f.by, x: f.ax, y: f.ay, tm: f.tm, sv: f.sv, shift: Math.hypot(f.bx, f.by) * (Math.max(...tt) - Math.min(...tt)),
+            snr: Math.min(...P.map((p) => p.snr)), fluxok: Math.max(...fl) <= 3 * Math.max(Math.min(...fl), 1e-9) });
+        });
+      });
     }
-    if (!MOVERS.length) { box.innerHTML = `<div class="text-secondary">No dipole above ${MOVER_SIGMA}σ between ${vis[0].label} and ${vis[vis.length - 1].label} for this detector choice.</div>`; }
-    else {
-      box.innerHTML = MOVERS.map((m, i) => `<div class="mover-row p-1 border-bottom border-secondary-subtle" data-i="${i}"><b>M${i + 1}</b> ${m.ra.toFixed(4)} ${m.dec.toFixed(4)} · ${m.snr.toFixed(1)}σ · ~${m.pm.toFixed(1)}″/yr (rough)</div>`).join('')
-        + `<div class="text-secondary mt-1">Baseline ${dt.toFixed(2)} yr. Click a row to pin it.</div>`;
-      box.querySelectorAll('.mover-row').forEach((r) => r.onclick = () => { const m = MOVERS[+r.dataset.i]; setPin(m.ra, m.dec); });
+    tracks.sort((p, q) => (q.n - p.n) || (p.chi - q.chi));
+    const used = new Set(), chosen = [];
+    for (const tr of tracks) { if (tr.pts.some((p) => used.has(p[0] + ':' + p[1]))) continue; if (tr.chi >= MV.CHI2) continue; tr.pts.forEach((p) => used.add(p[0] + ':' + p[1])); chosen.push(tr); }
+    const blended = (tr) => tr.pts.some(([k, j]) => { const d = D[k][j]; return D[k].some((e, jj) => jj !== j && Math.hypot(e.x - d.x, e.y - d.y) < 2.0); });
+    const why = { still: 0, slow: 0, fewVisits: 0, flux: 0, blend: 0 };
+    const keep = [];
+    for (const tr of chosen) {
+      if (tr.sig < MV.STILL) { why.still++; continue; }
+      if (tr.sig < MV.SIG || tr.shift < MV.SHIFT) { why.slow++; continue; }
+      if (tr.n < Math.ceil(2 * tr.covered / 3)) { why.fewVisits++; continue; }
+      if (!tr.fluxok) { why.flux++; continue; }
+      if (blended(tr)) { why.blend++; continue; }
+      keep.push(tr);
     }
+    // 6. what is it? compare with the target and Gaia DR3 at every visit date
+    const T = F.meta.target;
+    for (const tr of keep) {
+      const at = (k) => [tr.x + tr.vx * (t[k] - tr.tm), tr.y + tr.vy * (t[k] - tr.tm)];
+      const [ra0, de0] = pix2world(tr.x, tr.y), [ra1, de1] = pix2world(tr.x + tr.vx * 365.25, tr.y + tr.vy * 365.25);
+      const pmra = (ra1 - ra0) * Math.cos(de0 * D2R) * 3.6e6, pmdec = (de1 - de0) * 3.6e6;
+      const onTrack = (fn) => tr.pts.every(([k, j]) => { const [x, y] = fn(k); const d = D[k][j]; return Math.hypot(x - d.x, y - d.y) < 1.5; });
+      const g = gaia.find((s) => onTrack((k) => gpos(s, k)));
+      const isT = T && onTrack((k) => world2pix(...apparent(T.ra, T.dec, T.pmra || 0, T.pmdec || 0, T.plx || 0, T.epoch_mjd || 57388.0, t[k], E[k])));
+      const first = at(0), last = at(D.length - 1);
+      MOVERS.push({ ra: ra0, dec: de0, pmra, pmdec, pm: Math.hypot(pmra, pmdec) / 1000, epm: tr.sv * 365.25 * PIX, sig: tr.sig, n: tr.n, covered: tr.covered, snr: tr.snr,
+        px: first[0], py: first[1], nx: last[0], ny: last[1], track: tr.pts.map(([k, j]) => [D[k][j].x, D[k][j].y]),
+        gaia: g ? { id: g.id, pm: Math.hypot(g.pmra || 0, g.pmdec || 0) / 1000 } : null, target: isT ? { name: displayName(F.meta.key, F.meta.name), pm: Math.hypot(T.pmra || 0, T.pmdec || 0) / 1000 } : null });
+    }
+    MOVERS.sort((p, q) => q.sig - p.sig);
+    // is the target itself in a saturated patch (then it cannot be measured here, e.g. Barnard's Star)?
+    let targetSat = false;
+    if (T) stacks.forEach((c, k) => { const [x, y] = world2pix(...apparent(T.ra, T.dec, T.pmra || 0, T.pmdec || 0, T.plx || 0, T.epoch_mjd || 57388.0, t[k], E[k]));
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const xx = Math.round(x) + dx, yy = Math.round(y) + dy; if (xx >= 0 && yy >= 0 && xx < n && yy < n && (c.cat[yy * n + xx] & CAT_SAT)) targetSat = true; } });
+    MOVER_INFO = { visits: D.length, sources: D.map((d) => d.length), a: A, b: B, ncal: match.length, why, tracks: chosen.length, base, targetSat };
+    renderMovers();
     if (ovOn('movers')) drawOverlay();
+  }
+  function escapeHtml(x) { return String(x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function renderMovers() {
+    const box = $('moverList'), I = MOVER_INFO; if (!I) return;
+    const label = (m) => m.target ? `<span class="text-info">the target, ${escapeHtml(m.target.name)}</span> (catalogue ${m.target.pm.toFixed(2)}″/yr)`
+      : m.gaia ? `<span class="text-info">known star Gaia DR3 ${m.gaia.id}</span> (catalogue ${m.gaia.pm.toFixed(2)}″/yr)`
+      : '<span class="text-warning">not in Gaia DR3: check it by eye before believing it</span>';
+    const rows = MOVERS.map((m, i) => `<div class="mover-row p-1 border-bottom border-secondary-subtle" data-i="${i}" role="button" tabindex="0"><b>M${i + 1}</b> moves ${m.pm.toFixed(1)} ± ${m.epm.toFixed(1)}″/yr · ${m.sig.toFixed(1)}σ · seen in ${m.n} of ${m.covered} visits<br>${label(m)}</div>`).join('');
+    const w = I.why;
+    box.innerHTML = (I.targetSat ? '<div class="text-warning mb-1">The target is so bright that SPHEREx saturates on it, so it cannot be measured here. Its motion is still visible when you blink the visits or use shift-and-add.</div>' : '')
+      + (MOVERS.length ? rows : `<div>No moving object passed every test in ${I.visits} visits.</div>`)
+      + `<details class="st-about mt-2"><summary>How these were checked</summary>Checked ${I.tracks} sources seen in at least three visits over ${I.base.toFixed(2)} yr. Not reported: ${w.still} not moving, ${w.slow} motion too small to be sure (under 5σ or under 0.5 px), ${w.fewVisits} missing from too many visits, ${w.flux} changing brightness more than ×3, ${w.blend} blended with a neighbour. `
+      + `Position error per visit: ${I.a.toFixed(2)} px floor, measured on ${I.ncal} Gaia star positions in this field. Saturated stars and their surroundings are skipped.</details>`;
+    box.querySelectorAll('.mover-row').forEach((r) => { const go = () => { const m = MOVERS[+r.dataset.i]; setPin(m.ra, m.dec); }; r.onclick = go; r.onkeydown = (e) => { if (e.key === 'Enter') go(); }; });
   }
 
   // ---------------------------------------------------------------- tables / provenance
@@ -978,6 +1208,7 @@
     const m = F.meta, ex = m.exposures, t = m.target;
     const mj = ex.map((e) => e.mjd); const sat = ex.filter((e) => (e.target_flags || []).some((f) => f === 'OVERFLOW' || f === 'NONLINEAR')).length;
     $('provenance').innerHTML = `
+      ${(m.catalog_warnings || []).map((w) => `<div class="text-warning">${escapeHtml(w)} when this field was built; that layer is empty. Rebuilding later fixes it.</div>`).join('')}
       <div><b>${ex.length}</b> SPHEREx exposures, <b>${VISITS.length}</b> visits, ${mjdToDate(Math.min(...mj))} → ${mjdToDate(Math.max(...mj))}</div>
       <div>Grid ${m.grid.npix}×${m.grid.npix} px at ${m.grid.pixscale}″ (${(m.grid.npix * m.grid.pixscale / 60).toFixed(1)}′), centre ${m.grid.crval[0].toFixed(5)} ${m.grid.crval[1].toFixed(5)}</div>
       <div>Target PM ${fmt(t.pmra / 1000, 3)}, ${fmt(t.pmdec / 1000, 3)} ″/yr · ${m.source || ''}</div>
@@ -995,8 +1226,9 @@
     const near = F.meta.catalogs.gaia.map((s) => { const [ra, de] = propagate(s.ra, s.dec, s.pmra, s.pmdec, 57388.0, mjd); return { s, d: angSepDeg(tra, tde, ra, de) * 3600 }; })
       .filter((o) => o.d > 1.5 && o.d < 2.5 * PIX).sort((a, b) => a.d - b.d).slice(0, 3);
     const el = $('blendNote');
-    el.classList.toggle('d-none', !near.length);
+    $('blendBtn').classList.toggle('d-none', !near.length); el.classList.remove('show');
     el.textContent = near.length ? `Blend warning: ${near.map((o) => `Gaia DR3 ${o.s.id} (G=${o.s.g}) is ${o.d.toFixed(1)}″ away`).join('; ')} in ${mjdToDate(mjd).slice(0, 7)}. SPHEREx pixels are ${PIX}″, so their light overlaps; check the spectrum.` : '';
+    $('blendBtn').title = el.textContent;
   }
 
   // ---------------------------------------------------------------- live server (optional)
@@ -1015,7 +1247,7 @@
     veil(true, 'Searching the IRSA SPHEREx archive…');
     if (window.SkyJourney && isFinite(q.ra) && isFinite(q.dec)) SkyJourney.travel(+q.ra, +q.dec, true);
     try {
-      const params = new URLSearchParams(Object.entries(q).filter(([, v]) => v !== undefined && v !== null));
+      const params = new URLSearchParams(Object.entries(q).filter(([k, v]) => k !== 'label' && v !== undefined && v !== null && v !== ''));
       const job = await fetchJson('api/field?' + params.toString(), { method: 'POST' });
       let st = job;
       while (st.status !== 'done' && st.status !== 'error') {
@@ -1024,6 +1256,8 @@
         veil(true, st.message || 'Working…');
       }
       if (st.status === 'error') throw new Error(st.message);
+      if (q.label) setLocalName(st.key, q.label);
+      addMine(st.key);
       await loadIndex(); await openField(st.key, true);
     } catch (e) { if (window.SkyJourney) SkyJourney.arrive(); veil(true, 'Archive search failed: ' + e.message); setTimeout(() => veil(false), 6000); }
   }
@@ -1040,12 +1274,13 @@
     const half = 9.1 / 60 / 2 * 0.95;
     if (best && bd < half) {
       setMsg(msg, `Inside the ${best.name} field (${(bd * 60).toFixed(1)}′ from centre). Pinned.`, 'success');
+      addMine(best.key); renderLibrary();
       if (!F || F.meta.key !== best.key) await openField(best.key, true);
       setPin(r.ra, r.dec); return;
     }
-    if (LIVE) { setMsg(msg, `Searching IRSA at ${r.ra.toFixed(4)} ${r.dec.toFixed(4)}…`, 'info'); return liveBuild({ ra: r.ra, dec: r.dec }); }
+    if (LIVE) { setMsg(msg, `Searching IRSA at ${r.ra.toFixed(4)} ${r.dec.toFixed(4)}…`, 'info'); return liveBuild({ ra: r.ra, dec: r.dec, size: +$('sizeSel').value || 9 }); }
     if (LIVE_URL) {
-      const u = new URL(LIVE_URL); u.searchParams.set('ra', r.ra.toFixed(5)); u.searchParams.set('dec', r.dec.toFixed(5));
+      const u = new URL(LIVE_URL + 'app.html'); u.searchParams.set('ra', r.ra.toFixed(5)); u.searchParams.set('dec', r.dec.toFixed(5));
       msg.className = 'form-text small text-warning';
       msg.innerHTML = `${r.ra.toFixed(4)} ${r.dec.toFixed(4)} is outside the pre-built fields. <a href="${u.toString()}" target="_blank" rel="noopener">Search it on the live site</a>.`;
       return;
@@ -1054,6 +1289,15 @@
   }
 
   // ---------------------------------------------------------------- controls
+  // Field-of-view choices: the whole downloaded field (9′, 15′ or 20′, chosen at search time) or a zoom into it.
+  function fullFov() { return F ? +(F.np * PIX / 60).toFixed(1) : 9.1; }
+  function fillFov() {
+    const sel = $('fovSel'), full = fullFov(), opts = [[full, `${full}′ view (whole field)`]];
+    if (full > 9.2) opts.push([9.1, '9.1′ view']);
+    for (const v of [6, 4, 2.5]) opts.push([v, `${v}′ view (zoom)`]);
+    const key = opts.map((o) => o[0]).join(','); if (sel.dataset.key === key) return;
+    sel.dataset.key = key; sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  }
   function renderCustomList() {
     const A = parseSet(S.A), B = parseSet(S.B);
     $('customList').innerHTML = VISITS.map((v) => `<div class="d-flex align-items-center gap-2"><span class="flex-grow-1">${v.label} <span class="text-secondary">${v.range} (${v.idx.length})</span></span>
@@ -1072,10 +1316,10 @@
     $('modeHelp').textContent = MODE_HELP[S.mode];
     $('detSel').value = S.det; $('bandRange').value = S.band; $('tolRange').value = S.tol; $('winRange').value = S.win; $('spanRange').value = S.span;
     $('stretchSel').value = S.stretch; $('cmapSel').value = S.cmap; $('loRange').value = S.lo; $('hiRange').value = S.hi;
-    $('fovSel').value = String(S.fov); if ($('fovSel').value !== String(S.fov)) { S.fov = 9.1; $('fovSel').value = '9.1'; }
+    fillFov(); $('fovSel').value = String(S.fov); if ($('fovSel').value !== String(S.fov)) { S.fov = fullFov(); $('fovSel').value = String(S.fov); }
     $('saToggle').checked = !!S.sa; $('saPmra').value = S.sapmra; $('saPmdec').value = S.sapmdec;
     $('flatToggle').checked = !!S.flat; $('invToggle').checked = !!S.inv; $('smoothToggle').checked = !!S.smooth; $('lockScale').checked = !!S.lock;
-    $('diffToggle').checked = !!S.diff; $('diffRef').value = S.dref; $('diffRef').disabled = !S.diff; $('speedRange').value = S.speed;
+    $('diffToggle').checked = !!S.diff; $('diffRef').value = S.dref; $('diffRef').disabled = !S.diff; $('speedRange').value = 2080 - S.speed;
     for (const [id, k] of [['ovTarget', 'target'], ['ovGaia', 'gaia'], ['ovWise', 'wise'], ['ovTmass', 'tmass'], ['ovFlags', 'flags'], ['ovMovers', 'movers'], ['ovCompass', 'compass']]) $(id).checked = ovOn(k);
     $('bandCtl').classList.toggle('d-none', S.mode !== 'band'); $('scanCtl').classList.toggle('d-none', S.mode !== 'scan'); $('customCtl').classList.toggle('d-none', S.mode !== 'custom');
     $('diffToggle').disabled = S.mode === 'custom';
@@ -1104,6 +1348,7 @@
     $('diffRef').addEventListener('change', (e) => { S.dref = e.target.value; rebuild(); });
     rerenderOn('stretchSel', 'stretch'); rerenderOn('cmapSel', 'cmap'); rerenderOn('loRange', 'lo', Number); rerenderOn('hiRange', 'hi', Number);
     rerenderOn('fovSel', 'fov', Number);
+    $('fovSel').addEventListener('input', () => { if (currentSource() !== 'spherex') refreshSource(); });
     $('flatToggle').addEventListener('change', (e) => { S.flat = e.target.checked ? 1 : 0; rebuild(); });
     $('saToggle').addEventListener('change', (e) => { S.sa = e.target.checked ? 1 : 0; rebuild(); });
     for (const [id, k] of [['saPmra', 'sapmra'], ['saPmdec', 'sapmdec']]) $(id).addEventListener('change', (e) => { const v = parseFloat(e.target.value); S[k] = isFinite(v) ? v : 0; if (S.sa) rebuild(); else writeUrl(); });
@@ -1115,7 +1360,7 @@
       $(id).addEventListener('change', (e) => { const set = new Set(String(S.ov).split(',').filter(Boolean)); e.target.checked ? set.add(k) : set.delete(k); S.ov = [...set].join(','); drawOverlay(); writeUrl(); });
     }
     $('frameRange').addEventListener('input', (e) => { stopPlay(); S.frame = +e.target.value; renderFrame(); writeUrl(); });
-    $('speedRange').addEventListener('input', (e) => { S.speed = +e.target.value; writeUrl(); });
+    $('speedRange').addEventListener('input', (e) => { S.speed = 2080 - +e.target.value; writeUrl(); });   // right = faster (fewer ms per frame)
     $('playBtn').onclick = () => (playTimer ? stopPlay() : startPlay());
     $('prevBtn').onclick = () => step(-1); $('nextBtn').onclick = () => step(1);
     $('goBtn').onclick = onGo; $('coordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') onGo(); });
@@ -1128,6 +1373,35 @@
     $('specClean').addEventListener('change', (e) => { S.specClean = e.target.checked; drawSpectrum(); });
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach((b) => b.addEventListener('shown.bs.tab', () => { if (window.Plotly) { Plotly.Plots.resize('specPlot'); Plotly.Plots.resize('lcPlot'); } }));
     window.addEventListener('resize', () => { drawOverlay(); drawBandStrip(); });
+    // the panes change size without a window resize (rail hidden/shown, help opened): redraw the overlay and strip then too
+    if (window.ResizeObserver) { let raf = 0; const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { drawOverlay(); drawBandStrip(); }); }); ro.observe($('viewerWrap')); ro.observe($('bandStrip')); }
+    const setRail = (show) => {
+      $('console').classList.toggle('rail-hidden', !show); $('railShow').classList.toggle('d-none', show);
+      $('railToggle').setAttribute('aria-expanded', String(show));
+      try { localStorage.setItem('skytrace-rail', show ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+    };
+    $('railToggle').onclick = () => setRail(false); $('railShow').onclick = () => setRail(true);
+    const setSheet = (show) => {
+      $('console').classList.toggle('sheet-hidden', !show); $('sheetShow').classList.toggle('d-none', show);
+      $('sheetToggle').setAttribute('aria-expanded', String(show));
+      try { localStorage.setItem('skytrace-sheet', show ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+      if (show) setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    };
+    $('sheetToggle').onclick = () => setSheet(false); $('sheetShow').onclick = () => setSheet(true);
+    try { if (localStorage.getItem('skytrace-sheet') === '0') setSheet(false); } catch (e) { /* storage unavailable */ }
+    // small i / ! buttons next to the field name open a short note (hover also shows it)
+    const pop = (btn, box) => { $(btn).onclick = (e) => { e.stopPropagation(); const open = !$(box).classList.contains('show');
+      document.querySelectorAll('.st-pop.show').forEach((p) => p.classList.remove('show')); $(box).classList.toggle('show', open); $(btn).setAttribute('aria-expanded', String(open)); }; };
+    pop('noteBtn', 'fieldNote'); pop('blendBtn', 'blendNote');
+    document.addEventListener('click', (e) => { if (!e.target.closest('.st-pop')) document.querySelectorAll('.st-pop.show').forEach((p) => p.classList.remove('show')); });
+    $('saveHereBtn').onclick = openSaveModal;
+    $('exportGo').onclick = exportPdf;
+    $('exportAll').onclick = () => document.querySelectorAll('#exportPanel [data-ex]').forEach((c) => { c.checked = true; });
+    $('exportNone').onclick = () => document.querySelectorAll('#exportPanel [data-ex]').forEach((c) => { c.checked = false; });
+    $('exportPanel').addEventListener('show.bs.offcanvas', () => { if (F) $('exportWhat').textContent = `${displayName(F.meta.key, F.meta.name)}: ${F.meta.exposures.length} SPHEREx images in ${VISITS.length} visits${PIN ? ', with your pinned spot' : ''}. Tick what to include.`; $('exportMsg').textContent = ''; });
+    $('newFolderBtn').onclick = () => { const v = prompt('New folder name:'); if (v && v.trim()) { const dd = savedLoad(); dd.folders.push({ id: 'f' + uid(), name: v.trim().slice(0, 40), items: [] }); savedStore(dd); renderSaved(); } };
+    $('shareTop').onclick = () => { setSheet(true); bootstrap.Tab.getOrCreateInstance($('tabShareBtn')).show(); };
+    try { if (localStorage.getItem('skytrace-rail') === '0') setRail(false); } catch (e) { /* storage unavailable */ }
     document.addEventListener('keydown', (e) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName) && document.activeElement.type !== 'range') return;
       if (e.key === ' ') { e.preventDefault(); playTimer ? stopPlay() : startPlay(); }
@@ -1161,7 +1435,7 @@
     L.push('SKYTRACE CANDIDATE REPORT');
     L.push(`Generated: ${new Date().toISOString().slice(0, 19)}Z`);
     L.push(`View link: ${shareUrl()}`);
-    L.push(`Field: ${m.name}  centre ${cra.toFixed(5)} ${cdec.toFixed(5)}  (${raToHms(cra)} ${decToDms(cdec)})`);
+    L.push(`Field: ${displayName(m.key, m.name)}  centre ${cra.toFixed(5)} ${cdec.toFixed(5)}  (${raToHms(cra)} ${decToDms(cdec)})`);
     if (PIN) {
       L.push(`Candidate position (pinned): ${PIN.ra.toFixed(5)} ${PIN.dec.toFixed(5)}  (${raToHms(PIN.ra)} ${decToDms(PIN.dec)})`);
       const [gx, gy] = world2pix(PIN.ra, PIN.dec), ix = Math.round(gx), iy = Math.round(gy);
@@ -1185,8 +1459,8 @@
     L.push(`SPHEREx exposures in this frame (${mem.length}${mem.length > 25 ? ', first 25 listed' : ''}):`);
     mem.slice(0, 25).forEach((i) => { const e = ex[i]; L.push(`  ${e.obs_id}  D${e.det}  ${mjdToIso(e.mjd)} UTC  ${e.wave ? e.wave.toFixed(3) + ' um' : ''}  ${e.collection}`); });
     if (MOVERS.length) {
-      L.push(`Automatic mover candidates (first vs last visit, >${MOVER_SIGMA} sigma):`);
-      MOVERS.slice(0, 10).forEach((mv, k) => L.push(`  M${k + 1}  ${mv.ra.toFixed(5)} ${mv.dec.toFixed(5)}  ${mv.snr.toFixed(1)} sigma  ~${mv.pm.toFixed(1)}"/yr (rough)`));
+      L.push("Moving objects found by the multi-visit straight-line test (seen in >= 3 visits, motion >= 5 sigma):");
+      MOVERS.slice(0, 10).forEach((mv, k) => L.push(`  M${k + 1}  ${mv.ra.toFixed(5)} ${mv.dec.toFixed(5)}  motion ${mv.pm.toFixed(2)} +- ${mv.epm.toFixed(2)}"/yr (${mv.pmra.toFixed(0)}, ${mv.pmdec.toFixed(0)} mas/yr)  ${mv.sig.toFixed(1)} sigma  seen in ${mv.n}/${mv.covered} visits  ${mv.target ? 'target' : mv.gaia ? 'Gaia DR3 ' + mv.gaia.id : 'not in Gaia DR3'}`));
     }
     L.push('');
     L.push('Notes: ' + ($('reportNotes').value.trim() || '(none)'));
@@ -1208,15 +1482,180 @@
     };
   }
 
+
+  function currentSource() { const r = document.querySelector('input[name=src]:checked'); return r ? r.value : 'spherex'; }
+  function refreshSource() { if (window.SkyAladin && F) SkyAladin.compare(currentSource(), F.meta, (+S.fov || 9.1) / 60); }
+
+  // ---------------------------------------------------------------- explore list: fastest-moving stars in Gaia DR3
+  let EXPLORE = [];
+  async function loadExplore() {
+    try { EXPLORE = (await fetchJson('data/explore.json', { cache: 'no-cache' })).stars || []; } catch (e) { EXPLORE = []; }
+    renderFast();
+  }
+  function openExplore(k) {
+    const st = EXPLORE[k]; if (!st) return;
+    const label = `Fast star ${st.pm.toFixed(2)}″/yr (Gaia DR3 ${st.id})`;
+    // already built? (e.g. Barnard's Star, Epsilon Indi)
+    const [ra, dec] = propagate(st.ra, st.dec, st.pmra, st.pmdec, 57388.0, 61000);
+    const f = INDEX.fields.find((x) => angSepDeg(ra, dec, x.ra, x.dec) < 0.05);
+    if (f) { setMsg($('coordMsg'), `Opening ${f.name} (already built).`, 'success'); return openField(f.key, true); }
+    if (LIVE) { setMsg($('coordMsg'), `Searching IRSA for ${label}…`, 'info'); return liveBuild({ ra: st.ra, dec: st.dec, pmra: st.pmra, pmdec: st.pmdec, plx: st.plx, epoch_mjd: 57388.0, name: label, label, size: +$('sizeSel').value || 9 }); }
+    if (LIVE_URL) { const u = new URL(LIVE_URL + 'app.html'); Object.entries({ ra: st.ra, dec: st.dec, pmra: st.pmra, pmdec: st.pmdec, plx: st.plx, epoch: 57388.0 }).forEach(([kk, v]) => u.searchParams.set(kk, v)); window.open(u.toString(), '_blank'); return; }
+    setMsg($('coordMsg'), 'Live search needs the Skytrace server.', 'warning');
+  }
+  // ---------------------------------------------------------------- PDF export (one place per file)
+  // Built in the browser with jsPDF (MIT licence, vendor/jspdf.umd.min.js). Images are captured from the same canvases
+  // the viewer draws, so the PDF shows exactly what the tool computed; plots are re-drawn on white by Plotly.
+  function pdfText(s) {
+    // the built-in PDF fonts only have Western European characters: spell out the rest
+    return String(s ?? '').replace(/[″“”]/g, '"').replace(/[′‘’]/g, "'").replace(/σ/g, ' sigma').replace(/λ/g, 'lambda ').replace(/→/g, '->')
+      .replace(/[−–—]/g, '-').replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/α/g, 'a').replace(/δ/g, 'd').replace(/✓|☆|📍|📁/g, '').replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '?');
+  }
+  function captureFrame(withLayers) {
+    const img = $('imgCanvas'), ov = $('ovCanvas'), W = Math.max(700, img.width);
+    const c = document.createElement('canvas'); c.width = W; c.height = W; const g = c.getContext('2d');
+    g.fillStyle = '#05070b'; g.fillRect(0, 0, W, W); g.imageSmoothingEnabled = !!S.smooth; g.drawImage(img, 0, 0, W, W);
+    if (withLayers) { g.imageSmoothingEnabled = true; g.drawImage(ov, 0, 0, W, W); }
+    return c.toDataURL('image/jpeg', 0.92);
+  }
+  async function plotImage(id) {
+    const gd = $(id); if (!gd || !gd.data || !gd.data.length) return null;
+    const layout = JSON.parse(JSON.stringify(gd.layout || {}));
+    Object.assign(layout, { paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#111827', size: 12 }, width: 900, height: 480 });
+    for (const ax of ['xaxis', 'yaxis']) if (layout[ax]) layout[ax].gridcolor = '#d1d5db';
+    const data = JSON.parse(JSON.stringify(gd.data)).map((t) => { if (t.marker && t.marker.line && /255,\s*255,\s*255|#fff/i.test(String(t.marker.line.color))) t.marker.line.color = '#111827'; return t; });
+    return Plotly.toImage({ data, layout }, { format: 'png', width: 900, height: 480 });
+  }
+  async function exportPdf() {
+    if (!F || !window.jspdf) return;
+    const want = {}; document.querySelectorAll('#exportPanel [data-ex]').forEach((c) => { want[c.dataset.ex] = c.checked; });
+    const msg = $('exportMsg'); const say = (t) => { msg.textContent = t; };
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight(), M = 42, TW = PW - 2 * M; let y = M;
+    const m = F.meta, ex = m.exposures, name = displayName(m.key, m.name), [cra, cdec] = m.grid.crval;
+    const need = (h) => { if (y + h > PH - M) { doc.addPage(); y = M; } };
+    const h1 = (t, follow = 150) => { need(40 + follow); doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(10, 90, 100); doc.text(pdfText(t), M, y); y += 8; doc.setDrawColor(64, 200, 190); doc.line(M, y, PW - M, y); y += 16; doc.setTextColor(20, 20, 20); };
+    const para = (t, size = 10, font = 'helvetica', style = 'normal') => { doc.setFont(font, style); doc.setFontSize(size); for (const line of doc.splitTextToSize(pdfText(t), TW)) { need(size * 1.35); doc.text(line, M, y); y += size * 1.35; } y += 4; };
+    const mono = (lines) => { doc.setFont('courier', 'normal'); doc.setFontSize(7.5); for (const l of lines) { need(10); doc.text(pdfText(l).slice(0, 118), M, y); y += 9.5; } y += 6; };
+    const image = (url, w, h, caption) => { need(h + 24); doc.addImage(url, url.startsWith('data:image/png') ? 'PNG' : 'JPEG', M + (TW - w) / 2, y, w, h); y += h + 4; if (caption) { doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); for (const line of doc.splitTextToSize(pdfText(caption), TW)) { doc.text(line, M, y + 8); y += 11; } } y += 10; };
+    const keep = { frame: S.frame, diff: S.diff, dref: S.dref, mode: S.mode, src: currentSource() };
+    try {
+      say('Building the PDF…'); $('exportGo').disabled = true;
+      // title block
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(10, 90, 100); doc.text(pdfText(`Skytrace report: ${name}`), M, y + 6); y += 26;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(80, 80, 80);
+      doc.text(pdfText(`Field centre ${raToHms(cra)} ${decToDms(cdec)} (RA ${cra.toFixed(5)}, Dec ${cdec.toFixed(5)}) · made ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`), M, y); y += 13;
+      doc.text('NASA SPHEREx images via NASA/IPAC IRSA · Skytrace, NASA Space Apps Challenge 2026', M, y); y += 20; doc.setTextColor(20, 20, 20);
+      if (want.summary) {
+        h1('Target and field'); const t = m.target, mj = ex.map((e) => e.mjd);
+        para(`${m.note || ''}`);
+        mono([`Target position (catalogue): RA ${t.ra.toFixed(6)}  Dec ${t.dec.toFixed(6)}  at MJD ${t.epoch_mjd || 57388}`,
+          `Proper motion: ${(t.pmra || 0).toFixed(1)}, ${(t.pmdec || 0).toFixed(1)} mas/yr   parallax ${t.plx ? t.plx.toFixed(2) + ' mas' : 'not set'}`,
+          `Field: ${m.grid.npix} x ${m.grid.npix} px at ${m.grid.pixscale}" = ${(m.grid.npix * m.grid.pixscale / 60).toFixed(1)}' across`,
+          `SPHEREx images: ${ex.length} in ${VISITS.length} visits, ${mjdToDate(Math.min(...mj))} -> ${mjdToDate(Math.max(...mj))}`,
+          `Data releases: ${(m.collections || []).join(', ')}   built ${m.built || ''}`]);
+      }
+      if (want.current) { h1('The frame on screen', 380); const fr = FRAMES[S.frame]; image(captureFrame(want.layers), 360, 360, `${fr ? fr.label + ' - ' + (fr.sub || '') : ''}. North up, east left, ${S.fov}' shown.`); }
+      if (want.visits && S.mode === 'epoch' && !S.diff) {
+        const n = FRAMES.length, cols = n > 4 ? 3 : 2, w = (TW - (cols - 1) * 10) / cols; h1('One image per visit', w + 30);
+        for (let k = 0; k < n; k++) {
+          S.frame = k; renderFrame(); const url = captureFrame(want.layers);
+          if (k % cols === 0) need(w + 30);
+          const x = M + (k % cols) * (w + 10); doc.addImage(url, 'JPEG', x, y, w, w); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(pdfText(`${FRAMES[k].label}: ${FRAMES[k].sub || ''}`).slice(0, 70), x, y + w + 10);
+          if (k % cols === cols - 1 || k === n - 1) y += w + 22;
+          say(`Images ${k + 1}/${n}…`); await new Promise((r) => setTimeout(r, 0));
+        }
+      } else if (want.visits) { h1('One image per visit'); para('Switch the view to "Visits" without a difference image to include one image per visit.'); }
+      if (want.diff && VISITS.length >= 2) {
+        S.mode = 'epoch'; S.diff = 1; S.dref = 'first'; rebuild(); S.frame = FRAMES.length - 1; renderFrame();
+        h1('Difference image', 380); image(captureFrame(want.layers), 360, 360, `${FRAMES[S.frame].label}. Bright: light that appeared; dark: light that left. A moving object leaves a bright/dark pair.`);
+      }
+      if (want.diff || want.visits) { Object.assign(S, { diff: keep.diff, dref: keep.dref, mode: keep.mode }); rebuild(); S.frame = Math.min(keep.frame, FRAMES.length - 1); renderFrame(); }
+      if (want.channels) { drawBandStrip(); const c = $('bandStrip'); h1('102-channel coverage', 90); image(c.toDataURL('image/png'), TW, TW * c.height / c.width, `${$('bandStripInfo').textContent}. 0.75 um (left) to 5.0 um (right), detectors D1-D6.`); }
+      if (want.spectrum) { say('Drawing the spectrum…'); const u = await plotImage('specPlot'); h1('Spectrum', TW * 480 / 900 + 30); if (u) image(u, TW, TW * 480 / 900, $('specNote').textContent + ' Brightness of the target in every SPHEREx image (uJy) against wavelength; 2MASS and WISE points for comparison.'); else para('No spectrum: the target has no clean measurements (e.g. it saturates SPHEREx).'); }
+      if (want.spectable) {
+        h1('Spectrum values'); const rows = ex.map((e) => e).filter((e) => e.flux_ujy != null).sort((a, b) => a.wave - b.wave);
+        mono(['date (UTC)        det  lambda_um  chan   flux_uJy    err_uJy  n_bad', ...rows.map((e) => `${mjdToIso(e.mjd).padEnd(17)} ${String(e.det).padStart(3)}  ${(e.wave ?? 0).toFixed(4).padStart(9)}  ${String(e.band ?? '-').padStart(4)}  ${e.flux_ujy.toFixed(2).padStart(9)}  ${(e.flux_err ?? 0).toFixed(2).padStart(9)}  ${String(e.n_bad ?? '')}`)]);
+      }
+      if (want.lightcurve) { drawLightCurve(); const u = await plotImage('lcPlot'); h1('Light curve', TW * 480 / 900 + 30); if (u) image(u, TW, TW * 480 / 900, 'Each clean measurement divided by the median of the target in the same SPHEREx channel: a steady source stays at 1.'); else para('No light curve: no channel has two or more clean measurements of the target.'); }
+      if (want.movers) {
+        h1('Moving objects'); const I = MOVER_INFO;
+        if (!I) para('Motion can only be tested with at least three visits.');
+        else {
+          if (I.targetSat) para('The target saturates SPHEREx, so it cannot be measured by this search.');
+          if (!MOVERS.length) para(`No moving object passed every test in ${I.visits} visits.`);
+          mono(MOVERS.map((mv, k) => `M${k + 1}  RA ${mv.ra.toFixed(5)} Dec ${mv.dec.toFixed(5)}  ${mv.pm.toFixed(2)} +- ${mv.epm.toFixed(2)}"/yr (${mv.pmra.toFixed(0)}, ${mv.pmdec.toFixed(0)} mas/yr)  ${mv.sig.toFixed(1)} sigma  ${mv.n}/${mv.covered} visits  ${mv.target ? 'TARGET' : mv.gaia ? 'Gaia DR3 ' + mv.gaia.id + ' (' + mv.gaia.pm.toFixed(2) + '"/yr)' : 'NOT IN GAIA DR3 - check by eye'}`));
+          const w = I.why; para(`Method: sources detected in each visit; position errors measured on ${I.ncal} positions of non-moving Gaia DR3 stars (floor ${I.a.toFixed(2)} px); reported only if seen in >= 3 visits and >= 2/3 of those covering the path, straight-line fit chi2/dof < 4, motion >= 5 sigma and >= 0.5 px, brightness change < x3, no neighbour within 2 px. Of ${I.tracks} sources seen in 3+ visits over ${I.base.toFixed(2)} yr: ${w.still} not moving, ${w.slow} motion too small, ${w.fewVisits} missing from too many visits, ${w.flux} brightness change, ${w.blend} blended.`, 9);
+        }
+      }
+      if (want.visittable) { h1('Visits'); mono(['visit  first -> last date        images  wavelength', ...VISITS.map((v) => `${v.label.padEnd(9)} ${v.range.padEnd(26)} ${String(v.idx.length).padStart(5)}   ${waveRange(v.idx)}`)]); }
+      if (want.flags) {
+        h1('Quality flags at the target'); const cnt = {}; for (const e of ex) for (const f of (e.target_flags || [])) cnt[f] = (cnt[f] || 0) + 1;
+        const nbad = ex.filter((e) => (e.n_bad || 0) > 0).length;
+        para(`${nbad} of ${ex.length} images have at least one flagged pixel in the target's aperture (these are left out of the spectrum, as in IRSA's tutorial).`);
+        mono(Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([f, n]) => `${f.padEnd(18)} ${String(n).padStart(4)} images`));
+      }
+      if (want.exposures) { h1('Exposures'); mono(['date (UTC)        det  lambda_um  chan  flags at target', ...ex.map((e) => `${mjdToIso(e.mjd).padEnd(17)} ${String(e.det).padStart(3)}  ${(e.wave ?? 0).toFixed(4).padStart(9)}  ${String(e.band ?? '-').padStart(4)}  ${(e.target_flags || []).join(' ')}`)]); }
+      if (want.pin && PIN) { h1('Pinned position and nearby catalogued stars'); mono(buildReport().split('\n').filter((l) => /Pinned|Nearest|flag|Pixel/i.test(l))); }
+      const notes = ($('exportNotes').value || '').trim(); if (notes) { h1('Notes'); para(notes); }
+      if (want.settings) { h1('Settings and link'); mono([`mode ${S.mode}, detectors ${S.det}, difference ${S.diff ? 'on (' + S.dref + ')' : 'off'}, shift-and-add ${S.sa ? S.sapmra + '/' + S.sapmdec + ' mas/yr' : 'off'}`, `stretch ${S.stretch}, colours ${S.cmap}, black ${S.lo}% white ${S.hi}%, layers ${S.ov}`, `visit grouping: gap ${S.win} d, max ${S.span} d`]); para('Open this exact view: ' + shareUrl(), 8.5); }
+      if (want.sources) { h1('Data sources and credits'); para('NASA SPHEREx Level 2 spectral images (releases listed above) via the NASA/IPAC Infrared Science Archive (IRSA). Photometry follows the IRSA SPHEREx Source Discovery Tool tutorial. Catalogues: ESA Gaia DR3, NASA CatWISE2020 (WISE/NEOWISE), 2MASS Point Source Catalog, all via IRSA. Older-survey pictures: DSS2, 2MASS and AllWISE HiPS hosted by IRSA. This report was generated by Skytrace (NASA Space Apps Challenge 2026).', 9); }
+      const pages = doc.getNumberOfPages();
+      for (let p = 1; p <= pages; p++) { doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120); doc.text(pdfText(`Skytrace · ${name} · page ${p} of ${pages}`), M, PH - 20); }
+      doc.save(`skytrace-${m.key}-report.pdf`); say(`Downloaded a ${pages}-page PDF.`);
+    } catch (e) { console.error(e); say('Could not build the PDF: ' + e.message); }
+    finally { $('exportGo').disabled = false; if (S.frame !== keep.frame && keep.frame < FRAMES.length) { S.frame = keep.frame; renderFrame(); } }
+  }
+
+  // ---------------------------------------------------------------- exports: image (PNG) and measurements (CSV)
+  function download(name, blob) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function saveImage() {
+    if (!F || !FRAMES.length) return;
+    const fr = FRAMES[S.frame], img = $('imgCanvas'), ov = $('ovCanvas'), W = Math.max(900, ov.width), cap = Math.round(W * 0.16);
+    const c = document.createElement('canvas'); c.width = W; c.height = W + cap; const g = c.getContext('2d');
+    g.fillStyle = '#05070b'; g.fillRect(0, 0, c.width, c.height);
+    g.imageSmoothingEnabled = S.smooth ? true : false;          // keep SPHEREx pixels square, as on screen
+    g.drawImage(img, 0, 0, W, W); g.imageSmoothingEnabled = true; g.drawImage(ov, 0, 0, W, W);
+    const [cra, cdec] = F.meta.grid.crval, fs = Math.max(11, Math.round(W / 46));
+    const lines = [
+      `${displayName(F.meta.key, F.meta.name)} · ${fr.label}`,
+      `${fr.sub || ''}`,
+      `Centre ${raToHms(cra)} ${decToDms(cdec)} · field ${S.fov}′ · north up, east left · detectors: ${S.det}`,
+      `NASA SPHEREx images via NASA/IPAC IRSA · Skytrace (NASA Space Apps 2026)`];
+    g.fillStyle = '#d7e3ee'; g.font = `${fs}px system-ui, sans-serif`;
+    lines.forEach((t, i) => g.fillText(t, 10, W + fs * 1.35 * (i + 1)));
+    c.toBlob((b) => { download(`skytrace-${F.meta.key}-frame${S.frame + 1}.png`, b); setMsg($('shareMsg'), 'Image saved.', 'success'); }, 'image/png');
+  }
+  function csvCell(v) { if (v === null || v === undefined) return ''; const s = Array.isArray(v) ? v.join(' ') : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+  function saveCsv() {
+    if (!F) return;
+    const m = F.meta, [cra, cdec] = m.grid.crval, rows = [];
+    rows.push(`# Skytrace measurements of ${displayName(m.key, m.name)} (field centre RA ${cra.toFixed(5)}, Dec ${cdec.toFixed(5)})`);
+    rows.push(`# SPHEREx data: NASA/IPAC IRSA, collections ${(m.collections || []).join(' ')}; built ${m.built}`);
+    rows.push(`# Photometry: ${m.photometry}`);
+    rows.push(`# flux in microjansky (uJy); wavelength in micrometres at the target pixel; channel = official SPHEREx channel (1-102)`);
+    rows.push(`# Catalogue rows: 2MASS / WISE (CatWISE2020) magnitudes converted with published zero points, matched at each catalogue epoch`);
+    rows.push(['source', 'id', 'detector', 'date_utc', 'mjd', 'wavelength_um', 'bandwidth_um', 'channel', 'flux_uJy', 'flux_err_uJy', 'n_bad', 'photometry_flags', 'flags_at_target', 'collection', 'url'].join(','));
+    for (const e of m.exposures) rows.push(['SPHEREx', e.obs_id, e.det, e.date, e.mjd, e.wave, e.bw, e.band, e.flux_ujy, e.flux_err, e.n_bad, e.phot_flags, e.target_flags, e.collection, e.url].map(csvCell).join(','));
+    for (const p of (m.sed || []).filter((q) => q.flux_ujy != null)) rows.push([p.band, p.id, '', '', p.mjd, p.wave, '', '', p.flux_ujy, p.err, '', p.qual ? 'ph_qual=' + p.qual : '', '', '', ''].map(csvCell).join(','));
+    download(`skytrace-${m.key}-measurements.csv`, new Blob([rows.join('\n') + '\n'], { type: 'text/csv' }));
+    setMsg($('shareMsg'), `Downloaded ${m.exposures.length} SPHEREx measurements.`, 'success');
+  }
+
   // ---------------------------------------------------------------- boot
   async function boot() {
     bind(); bindReport();
+    $('saveImgBtn').onclick = saveImage; $('saveCsvBtn').onclick = saveCsv;
+    document.querySelectorAll('input[name=src]').forEach((r) => r.addEventListener('change', () => { if (r.checked) refreshSource(); }));
     const clock = () => { const c = $('hudClock'); if (c) c.textContent = new Date().toISOString().slice(11, 19); };
     clock(); setInterval(clock, 1000);
     const logo = (window.SKYTRACE_LOGO || '').trim();
     if (logo) {
       const im = $('brandLogo');
-      im.onload = () => { im.classList.remove('d-none'); $('brandSvg').classList.add('d-none'); document.querySelector('.st-nav .navbar-brand').classList.add('visually-hidden'); };
+      im.onload = () => { im.classList.remove('d-none'); $('brandSvg').classList.add('d-none'); const bn = document.querySelector('.st-brand-name'); if (bn) bn.classList.add('visually-hidden'); };
       im.srcset = logo.replace(/\.png$/, '@2x.png') + ' 2x'; im.src = logo;
     }
     if (window.SkyJourney) {
@@ -1227,7 +1666,9 @@
     }
     const p = readUrl();
     if (p.get('embed') === '1') document.body.classList.add('embed');
-    await loadIndex();
+    const sharedFolder = p.get('folder');
+    await loadIndex(); loadExplore();
+    if (sharedFolder) { importFolder(sharedFolder); const u = new URL(location.href); u.searchParams.delete('folder'); history.replaceState(null, '', u.toString()); }
     if (!INDEX.fields.length && !LIVE) { veil(true, 'No data found. Run backend/build_static.py first.'); return; }
     let key = p.get('field');
     const ra = parseFloat(p.get('ra')), dec = parseFloat(p.get('dec'));
@@ -1235,7 +1676,11 @@
     if (!key && isFinite(ra) && isFinite(dec)) {
       let best = null, bd = Infinity; for (const f of INDEX.fields) { const d = angSepDeg(ra, dec, f.ra, f.dec); if (d < bd) { bd = d; best = f; } }
       if (best && bd < 0.07) key = best.key;
-      else if (LIVE) { await liveBuild({ ra, dec }); applyParams(p); syncControls(); rebuild(); return; }
+      else if (LIVE) {
+        const num = (k) => { const v = parseFloat(p.get(k)); return isFinite(v) ? v : undefined; };
+        await liveBuild({ ra, dec, pmra: num('pmra'), pmdec: num('pmdec'), plx: num('plx'), epoch_mjd: num('epoch'), size: [9, 15, 20].includes(num('size')) ? num('size') : 9 });
+        applyParams(p); syncControls(); rebuild(); return;
+      }
       else setMsg($('coordMsg'), `Link points to ${ra.toFixed(4)} ${dec.toFixed(4)}, outside the pre-built fields; showing a demo field.`, 'warning');
     }
     key = key || (INDEX.fields[0] && INDEX.fields[0].key);
@@ -1246,6 +1691,6 @@
     if (p.get('play') === '1') startPlay();
   }
   // Read-only hooks used by the automated browser tests (tests/ui_test.py)
-  window.__skytrace = { buildReport, get F() { return F; }, get FRAMES() { return FRAMES; }, get VISITS() { return VISITS; }, S, world2pix, pix2world, parseInput, raToHms, decToDms, get MOVERS() { return MOVERS; } };
+  window.__skytrace = { exportPdf, buildReport, saveCsv, saveImage, get F() { return F; }, get FRAMES() { return FRAMES; }, get VISITS() { return VISITS; }, S, world2pix, pix2world, parseInput, raToHms, decToDms, get MOVERS() { return MOVERS; }, get MOVER_INFO() { return MOVER_INFO; } };
   boot();
 })();

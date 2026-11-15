@@ -8,7 +8,7 @@ async def main():
         pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("console", lambda m: m.type == "error" and errs.append(m.text))
         await pg.goto(BASE + "?field=barnard"); await pg.wait_for_timeout(5000)
         await pg.screenshot(path="/home/claude/scratch/j0.png")
-        await pg.click("#targetButtons button[data-key=wise0855]"); await pg.wait_for_timeout(500)
+        await pg.click("#libTargets .st-item[data-key=wise0855]"); await pg.wait_for_timeout(500)
         await pg.screenshot(path="/home/claude/scratch/j1_flight.png")
         await pg.wait_for_timeout(3000)
         await pg.screenshot(path="/home/claude/scratch/j2_landed.png")

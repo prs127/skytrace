@@ -1,0 +1,10 @@
+wise0855  det=lw   visits=3 dets/visit=[41, 54, 52] still tracks=29 chosen=32 a=0.150px b=0.30 calib=102 movers=1
+   133.75966 -7.24189  pm=7.21±1.39"/yr (-7190,+485 mas/yr) n=3/3 5.2sig chi2/dof=0.09 shift=1.16px snr>=4.9 no Gaia match | target WISE 0855-0714 catalogue pm 8.16"/yr
+wise0855  det=all  visits=3 dets/visit=[63, 64, 65] still tracks=54 chosen=55 a=0.069px b=0.73 calib=177 movers=0
+epsindib  det=all  visits=4 dets/visit=[82, 53, 56, 55] still tracks=36 chosen=38 a=0.116px b=0.30 calib=152 movers=1
+   331.09693 -56.80087  pm=4.51±0.68"/yr (+3817,-2393 mas/yr) n=4/4 6.6sig chi2/dof=0.18 shift=1.01px snr>=184.2 Gaia 6412596012146801152 pm 4.68"/yr | target Epsilon Indi B catalogue pm 4.68"/yr
+barnard   det=all  visits=3 dets/visit=[47, 47, 47] still tracks=42 chosen=42 a=0.047px b=0.36 calib=141 movers=0
+rwaur     det=all  visits=3 dets/visit=[63, 63, 63] still tracks=47 chosen=47 a=0.077px b=1.18 calib=168 movers=0
+rdra      det=all  visits=9 dets/visit=[14, 16, 17, 18, 11, 12, 16, 19, 17] still tracks=13 chosen=15 a=0.311px b=0.30 calib=114 movers=0
+m101      det=all  visits=3 dets/visit=[21, 22, 22] still tracks=13 chosen=13 a=0.111px b=0.52 calib=57 movers=0
+m101      det=2    visits=3 dets/visit=[19, 19, 19] still tracks=11 chosen=11 a=0.147px b=0.30 calib=52 movers=0

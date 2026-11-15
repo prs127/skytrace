@@ -9,7 +9,7 @@ keys = sys.argv[2:] or [f["key"] for f in idx["fields"]]
 for k in keys:
     p = os.path.join(d, k + ".json"); m = json.load(open(p))
     g = m["grid"]; radius = g["npix"] * P.PIXSCALE_ARCSEC / 3600 / math.sqrt(2) + 0.01
-    cats = P.query_catalogs(g["crval"][0], g["crval"][1], radius)
+    cats = P.query_catalogs(g["crval"][0], g["crval"][1], radius); cats.pop("warnings", None)
     if not cats["gaia"] or not cats["catwise"]:
         print(f"[skip] {k}: catalogue query incomplete"); continue
     m["catalogs"] = cats

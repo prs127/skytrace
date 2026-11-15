@@ -118,9 +118,11 @@
     }
     // pre-built fields
     for (const f of this.fields) {
-      const p = this.xy(f.ra, f.dec); g.fillStyle = 'rgba(110,168,254,.95)';
-      g.beginPath(); g.moveTo(p[0], p[1] - 3.5); g.lineTo(p[0] + 3.5, p[1]); g.lineTo(p[0], p[1] + 3.5); g.lineTo(p[0] - 3.5, p[1]); g.closePath(); g.fill();
-      if (W > 320 && this.opts.labels) { g.fillStyle = 'rgba(206,212,218,.75)'; g.fillText(f.name.split(' ')[0], p[0] + 5, p[1] - 4); }
+      // challenge fields: blue diamonds with their name; the user's own searches: small grey diamonds, no label
+      const user = f.user !== undefined ? f.user : /^RA\s/.test(f.name), p = this.xy(f.ra, f.dec), r = user ? 2.5 : 3.5;
+      g.fillStyle = user ? 'rgba(173,181,189,.8)' : 'rgba(110,168,254,.95)';
+      g.beginPath(); g.moveTo(p[0], p[1] - r); g.lineTo(p[0] + r, p[1]); g.lineTo(p[0], p[1] + r); g.lineTo(p[0] - r, p[1]); g.closePath(); g.fill();
+      if (W > 320 && this.opts.labels && !user) { g.fillStyle = 'rgba(206,212,218,.75)'; g.fillText(f.name.split(' ')[0], p[0] + 5, p[1] - 4); }
     }
     // trail
     if (this.trail.length > 1) this.line(this.trail, 'rgba(255,214,102,.8)', 1.2, [2, 3]);

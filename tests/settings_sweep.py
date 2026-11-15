@@ -156,7 +156,7 @@ async def run_pass(pg, key, res):
     await pg.click("#nextBtn"); await pg.wait_for_timeout(150)
     ok("next button wraps to first frame", await pg.evaluate(f"{sk}.S.frame") == 0)
     await pg.evaluate("__mode('exp')"); await pg.wait_for_timeout(400)
-    await pg.evaluate("__set('speedRange', 200)"); await pg.wait_for_timeout(100)
+    await pg.evaluate("__set('speedRange', 2080 - 200)"); await pg.wait_for_timeout(100)
     f0 = await pg.evaluate(f"{sk}.S.frame"); await pg.click("#playBtn"); await pg.wait_for_timeout(2100); await pg.click("#playBtn")
     f1 = await pg.evaluate(f"{sk}.S.frame"); adv = (f1 - f0) % await pg.evaluate(f"{sk}.FRAMES.length")
     ok("play at 200 ms/frame advances ~10 frames in 2.1 s", 8 <= adv <= 11, f"advanced {adv}")
@@ -164,6 +164,7 @@ async def run_pass(pg, key, res):
     # --- 11. Share link restores the exact view
     await pg.evaluate("__mode('band'); __set('detSel', 'all'); __set('bandRange', 77); __set('tolRange', 1); __set('cmapSel', 'inferno'); __set('fovSel', '6');"); await pg.wait_for_timeout(400)
     url = await pg.input_value("#shareUrl"); want = await pg.evaluate(f"JSON.stringify({sk}.S)")
+    url = url.replace(url.split('?')[0], pg.url.split('?')[0])   # same link, served by the local test server
     p2 = await pg.context.new_page(); await p2.goto(url, wait_until="networkidle"); await p2.wait_for_timeout(2500)
     got = await p2.evaluate(f"JSON.stringify({sk}.S)"); await p2.close()
     w, g = json.loads(want), json.loads(got)

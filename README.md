@@ -14,11 +14,19 @@ through wavelength, and get an on-the-fly spectrum and light curve of the target
 - Difference images, detector-balanced stacks, mesh-median background flattening
 - 102-channel coverage strip; per-exposure forced photometry spectrum and light curve
 - Overlays: target track propagated from proper motion, Gaia DR3 (ESA) and CatWISE2020 (NASA) sources moved to the frame date,
-  SPHEREx data-quality flags (saturation, artefacts, masked), experimental mover finder, compass and scale bar
+  SPHEREx data-quality flags (saturation, artefacts, masked), moving-object tracks, compass and scale bar
 - Blend warning when a catalogued star overlaps the target
 - **Where in the sky**: an all-sky map (RA/Dec, ecliptic, Milky Way plane); a small rocket flies to each new search and circles it
   while the archive is searched; click the map to search there
-- **Aladin Lite** (CDS) view of the field on IRSA's official SPHEREx DR1 all-sky HiPS cube (102 slices), AllWISE, 2MASS or DSS2
+- **Atlas**: Aladin Lite (CDS) on IRSA's SPHEREx DR1 all-sky HiPS cube (any of its 100 non-blank channels), AllWISE, 2MASS or DSS2
+- **Pages**: a one-off animated Welcome (`index.html`, skippable, respects reduced-motion), Home (`home.html`), Dashboard (`app.html`: Library on the left, image in the centre, Analysis panel on the right, both side panels collapsible) and How to use (`guide.html`, every control explained); a "?" on every panel links to the matching guide section
+- **Compare with other skies**: switch the viewer to optical DSS2, 2MASS or AllWISE images of the same place (NASA IRSA's HiPS copies via Aladin Lite)
+- **Library**: challenge targets, the 25 fastest-moving stars in Gaia DR3 (selected by a fixed rule, `backend/make_explore.py`), searched live with their motion and parallax, and the visitor's own searches (renamable, kept in the browser)
+- **Moving-object search**: straight-line motion through ≥ 3 visits at ≥ 5σ with field-measured position errors; checked on known movers, by injection into real exposures and by an independent Python implementation
+- **Field size**: new searches can download 9′, 15′ or 20′ fields
+- **Saved places**: bookmarks of whole fields or pinned spots in named folders (rename, move, delete, notes), stored in the browser; a folder is shared as a link that carries the list (no server)
+- **Export PDF**: per place, with checkboxes for overview, images (frame, every visit, difference, channel strip), spectrum plot and table, light curve, moving objects and method, visits, exposures, flags, pinned spot, notes, settings and credits (jsPDF 4.2.1, MIT, vendored)
+- **Export**: save the current frame as a captioned PNG, or download every SPHEREx measurement of the target (plus 2MASS/WISE) as CSV
 - **Report a candidate**: a plain-text write-up of the current view (link, pinned position, nearest Gaia/CatWISE stars,
   pixel flags, exposures, visits) to copy or download
 - New data releases are picked up automatically: IRSA SPHEREx collections are discovered at run time
@@ -43,9 +51,9 @@ through wavelength, and get an on-the-fly spectrum and light curve of the target
 | IRSA SIA2 (`astroquery.ipac.irsa.Irsa.query_sia`, `list_collections`) | NASA/IPAC IRSA | Every SPHEREx spectral image covering a position, in all current releases (DR1, QR3, deep fields) |
 | IRSA public AWS bucket `s3://nasa-irsa-spherex` (astropy + fsspec byte-range reads) | NASA/IPAC IRSA on AWS Open Data | Image pixels, FLAGS, VARIANCE, ZODI, ePSF, WCS-WAVE; DR1 solid-angle pixel maps |
 | IRSA TAP (`https://irsa.ipac.caltech.edu/TAP`, PyVO) | NASA/IPAC IRSA | Gaia DR3 (ESA) `gaia_dr3_source`, CatWISE2020 `catwise_2020`, 2MASS `fp_psc` |
-| IRSA HiPS `SPHEREx/spherex_allsky_cube` | NASA/IPAC IRSA (SPHEREx Science Data Center) | 102-channel all-sky map in the Aladin tab |
+| IRSA HiPS `SPHEREx/spherex_allsky_cube` | NASA/IPAC IRSA (SPHEREx Science Data Center) | 102-channel all-sky map in the Atlas tab |
 | IRSA DR1 cube tile (`ibe/data/spherex/dr1/hips5_cube`) | NASA/IPAC IRSA | Official `SPECTRAL_CHANNELS` table (102 channels) |
-| CDS HiPS (AllWISE, 2MASS, DSS2) via Aladin Lite | CDS Strasbourg | Context images in the Aladin tab |
+| IRSA-hosted HiPS of AllWISE, 2MASS, DSS2 colour (`irsa.ipac.caltech.edu/data/hips/CDS/...`), drawn with Aladin Lite (CDS) | NASA/IPAC IRSA (maps made by CDS) | Comparison images above the viewer and in the Atlas tab; alignment with Gaia DR3 checked by `tests/hips_align.py` |
 
 ## Data sources (everything traceable)
 | What | Source |
@@ -61,6 +69,34 @@ through wavelength, and get an on-the-fly spectrum and light curve of the target
 | Multi-mission spectrum points | 2MASS J/H/Ks (NASA/IPAC) and CatWISE2020 W1/W2, matched at each catalogue's own epoch with the target's proper motion; zero points Cohen et al. 2003 (2MASS) and Jarrett et al. 2011 (WISE) |
 | WISE 0855 motion | Fit to 296 NEOWISE-R single-exposure detections (NASA), IRSA TAP |
 | Target descriptions | Challenge text only |
+
+## Validation (Prototype 8, 15 Nov 2026): user walkthrough
+- `tests/user_walkthrough.py` follows the How-to-use guide as a first-time user and checks every control (70 checks:
+  welcome to home to guide, library, i/! notes, play and speed direction, all layers, modes, detectors, difference
+  references, view size, Display menu, compare surveys, every analysis tab, shift-and-add, saved places with a shared
+  folder opened in a fresh browser profile, PDF export containing only the ticked sections, share link, help links,
+  panel collapse, keyboard, URL settings, old links): 70/70. It found and we fixed three real bugs: the dashboard
+  collapsed after the spectrum's log-axis switch (Plotly's measuring box and the export panel had entered the page
+  layout), and the page jumped to the bottom on load (the visit strip scrolled the page, not just itself).
+
+## Validation (Prototype 7, 15 Nov 2026): moving-object search and pages
+- **Moving-object search** (`tests/movers_ref.py`, `tests/movers_inject.py`, `tests/movers_parity.py`): WISE 0855 found at
+  7.21 ± 1.39″/yr (catalogue 8.16), Epsilon Indi B at 4.51 ± 0.68″/yr (Gaia DR3 4.68); nothing reported in Barnard, RW Aur,
+  R Dra, M101. Injection of 288 fake sources into the real exposures (6 fields × 2 seeds): 86 of 133 measurable movers
+  recovered, 0 of 144 still sources reported, 0 unexplained reports. Browser = Python reference on 12 fields.
+- **Pages**: browser suites rerun on `app.html`; old `/?field=…` links redirect to the dashboard.
+
+## Validation (Prototype 6, 15 Nov 2026): layout and image sources
+- **Older-survey alignment** (`tests/hips_align.py`, result in `tests/hips_align_result.txt`): the DSS2, 2MASS and AllWISE colour
+  maps now come from NASA IRSA's own HiPS copies (CDS has been unavailable since 9 Nov 2026). In the exact tiles the viewer
+  loads, isolated slow Gaia DR3 stars sit at a worst-field median offset of 1.32″ (DSS2), 0.45″ (2MASS) and 0.46″ (AllWISE)
+  from their catalogue positions at all 6 fields, at most 0.21 of a SPHEREx pixel.
+- **Atlas channels** (`tests/atlas_frames.py`): choosing SPHEREx channel k loads cube frame k for 100/100 non-blank channels.
+  Fixed: Aladin Lite's own slider mapped slices to frames non-linearly and in reverse and opened on a blank frame.
+- **Layout** (`tests/layout_shot.py`, `tests/layout_ui_test.py`): at 1920×1080, 1440×900 and 1280×720 the page fits the window
+  and each pane scrolls on its own; tablet and phone stack the panes; no horizontal overflow; every data tab, help button,
+  rail hide/show and the keyboard work. Existing browser suites rerun on the new layout: `ui_test.py`, `ui_test_p2.py`,
+  `new_ui_test.py`, `explore_test.py`, `parse_test.py` (6/6), `settings_sweep.py` (216/216).
 
 ## Validation (Prototype 5, 15 Nov 2026): full audit in `AUDIT.md`
 - Displayed frames re-computed from the raw IRSA files (`validate_frames.py`): vs `reproject_interp` median difference

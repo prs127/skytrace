@@ -16,7 +16,7 @@ for t in TARGETS:
         continue
     t0 = time.time()
     try:
-        pkg = build_field(t, npix=89, workers=16, max_exposures=700, collections=cols)
+        pkg = build_field(t, npix=89, workers=32, max_exposures=700, collections=cols)
     except Exception as exc:
         print(f"[FAIL] {t.key}: {exc}"); continue
     write_package(pkg, out)
