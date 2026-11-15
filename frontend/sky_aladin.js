@@ -77,7 +77,7 @@
         aladin = window.A.aladin('#aladinDiv', {
           survey: SURVEYS[$('aladinSurvey').value] || SURVEYS.spherex, fov: 0.25, cooFrame: 'ICRS', log: false,
           showReticle: true, showCooGridControl: true, showFullscreenControl: true, showLayersControl: false,
-          showSimbadPointerControl: false, showShareControl: false, showProjectionControl: false,
+          showSimbadPointerControl: false, showShareControl: false, showProjectionControl: false, showFrame: false, showCooLocation: false,
         });
       }
       update(meta);
@@ -91,8 +91,8 @@
         showFrame(k);
       }
       say(isCube
-        ? 'SPHEREx DR1 all-sky map from IRSA (12.9″ pixels, all visits combined, so it does not show motion; use the main viewer for that). Choose any of its 100 channel maps above.'
-        : LABEL[$('aladinSurvey').value] + ' (HiPS hosted by NASA IRSA). Blue circles: Gaia DR3; orange squares: CatWISE2020; yellow cross: target.');
+        ? 'All visits combined (no motion here). Pick a channel above; scroll to zoom.'
+        : LABEL[$('aladinSurvey').value] + '. Blue circles: Gaia DR3; orange squares: CatWISE2020; yellow cross: target.');
     } catch (e) { say(e.message + ' (needs internet access to the IRSA servers).', 'text-warning'); }
   }
 
@@ -129,9 +129,12 @@
   };
   let cmp = null;
   async function compare(key, m, fovDeg) {
-    const view = $('srcView'), note = $('srcNote');
-    if (!key || key === 'spherex' || !SURVEYS[key]) { view.classList.add('d-none'); return; }
+    const view = $('srcView'), note = $('srcNote'), card = $('srcCard'), stage = document.querySelector('.st-stage');
+    const comparing = !!(key && key !== 'spherex' && SURVEYS[key]);
+    if (card) card.classList.toggle('d-none', !comparing); if (stage) stage.classList.toggle('st-comparing', comparing);
+    if (!comparing) { view.classList.add('d-none'); return; }
     const survey = SURVEYS[key];
+    if ($('srcTitle')) $('srcTitle').textContent = 'Comparing with ' + LABEL[key];
     view.classList.remove('d-none');
     note.textContent = 'Loading ' + LABEL[key] + '…';
     try {
@@ -139,11 +142,11 @@
       await preflight(survey);
       if (!cmp) cmp = window.A.aladin('#srcAladin', { survey, fov: fovDeg, cooFrame: 'ICRS', log: false, showReticle: true, showCooGridControl: false,
         showLayersControl: false, showSimbadPointerControl: false, showShareControl: false, showProjectionControl: false, showFullscreenControl: false,
-        showZoomControl: true, showFrame: false, showCooLocation: true });
+        showZoomControl: true, showFrame: false, showCooLocation: false });
       else cmp.setBaseImageLayer(survey);
       if (m) { cmp.gotoRaDec(m.grid.crval[0], m.grid.crval[1]); }
       cmp.setFoV(fovDeg);
-      note.textContent = (NOTES[key] || '') + ' Image: HiPS hosted by NASA IRSA, drawn with Aladin Lite. Centre and field match the SPHEREx view; click SPHEREx to go back.';
+      note.textContent = (NOTES[key] || '') + ' Same centre and field as the SPHEREx view. Image: HiPS maps hosted by NASA IRSA, drawn with Aladin Lite; scroll to zoom.';
     } catch (e) { note.textContent = e.message + '. The comparison pictures need internet access to NASA IRSA; try again in a moment.'; }
   }
   window.SkyAladin = { update: (m) => update(m), compare, showFrame, sliceFor: (k) => sliceFor(k), get cube() { return cube; }, get instance() { return aladin; }, get compareInstance() { return cmp; } };

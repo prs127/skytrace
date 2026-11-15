@@ -80,9 +80,19 @@ def health():
 def releases():
     """SPHEREx collections IRSA serves right now (cached 10 minutes)."""
     if time.time() - _releases_cache["t"] > 600:
+        import pipeline
         _releases_cache["collections"] = discover_collections()
-        _releases_cache["t"] = time.time()
+        # only remember a list IRSA actually returned (not the built-in fallback used during an IRSA outage)
+        _releases_cache["t"] = time.time() if pipeline._COLLECTIONS_CACHE else 0
     return {"collections": _releases_cache["collections"], "checked": _releases_cache["t"]}
+
+
+def _missing_catalogs(key: str) -> bool:
+    """A field saved while an IRSA catalogue query failed is rebuilt on the next request instead of being reused."""
+    try:
+        return bool(json.loads((DATA / f"{key}.json").read_text()).get("catalog_warnings"))
+    except Exception:
+        return False
 
 
 @app.post("/api/field")
@@ -92,7 +102,7 @@ def start_field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge
     if size not in FIELD_SIZES:
         raise HTTPException(400, f"size must be one of {sorted(FIELD_SIZES)} arcmin")
     key = field_key(ra, dec, pmra, pmdec, size)
-    if not force and (DATA / f"{key}.json").exists():
+    if not force and (DATA / f"{key}.json").exists() and not _missing_catalogs(key):
         return {"id": None, "status": "done", "key": key, "message": "cached"}
     running = [j for j in JOBS.values() if j["status"] == "running"]
     for j in running:

@@ -18,7 +18,7 @@
   #bg.on { opacity: 1; }
   #shade { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(2, 4, 10, .15) 0%, rgba(2, 4, 10, .55) 70%, rgba(2, 4, 10, .85) 100%); }
   .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-  .logo { position: relative; width: min(86vw, 1150px, calc((100vh - 140px) * 2.115)); aspect-ratio: 406 / 192; }
+  .logo { position: relative; width: min(88vw, 1250px, calc((100vh - 150px) * 2.099)); aspect-ratio: 1805 / 860; }
   .logo img, .logo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .logo img { opacity: 0; transition: opacity 1.4s ease; filter: drop-shadow(0 0 18px rgba(120, 200, 255, .25)); }
   .logo img.on { opacity: 1; }
@@ -41,7 +41,7 @@
 <main class="stage">
   <h1 class="sr-only">Skytrace</h1>
   <div class="logo" id="logo">
-    <img id="logoImg" src="assets/logo-nostar@2x.png" alt="Skytrace">
+    <img id="logoImg" src="assets/logo-nostar-hi.png" alt="Skytrace">
     <canvas id="fx" aria-hidden="true"></canvas>
   </div>
 </main>
@@ -76,54 +76,63 @@
   }
   drawSky(); addEventListener('resize', () => { drawSky(); drawFinal(); });
 
-  // ---- logo geometry, in the logo image's own pixels (406 x 192): the outer ring of the logo is close to an ellipse
-  // centred (202, 97), semi-axes 207 x 40, tilted -19 degrees; the yellow star sits at (189.5, 31.5)
-  const LW = 406, LH = 192, E = { cx: 202, cy: 97, a: 207, b: 40, rot: -19 * Math.PI / 180 }, STAR = { x: 189.5, y: 31.5, r: 12.5 };
+  // ---- logo geometry, in the pixels of assets/logo-nostar-hi.png (1805 x 860, cropped from the 2000 px logo).
+  // PATH: the logo's outermost orbit, an ellipse fitted to the logo's own pixels (centre 957.8, 1000.1 in the 2000 px
+  // original, semi-axes 871.4 x 129.2, tilt 161.3 deg; median miss 0.9 px): from its lower-left end along the bottom,
+  // round the right end and back along the top, then straight on to the yellow star.
+  const LW = 1805, STAR = { x: 842.5, y: 147, box: [786, 88, 114, 119] };
+  const PATH = [[64.9,714.7],[69.6,719.9],[75.5,723.8],[81.8,726.8],[88.5,729.1],[95.3,730.9],[102.2,732.3],[109.1,733.4],[116.1,734.2],[123.1,734.8],[130.1,735.2],[137.2,735.5],[144.2,735.6],[151.2,735.6],[158.3,735.5],[165.3,735.3],[172.3,735.0],[179.4,734.7],[186.4,734.2],[193.4,733.7],[200.4,733.2],[207.4,732.6],[214.4,731.9],[221.4,731.2],[228.4,730.4],[235.4,729.6],[242.4,728.8],[249.4,727.9],[256.4,726.9],[263.3,726.0],[270.3,725.0],[277.3,724.0],[284.2,722.9],[291.2,721.8],[298.1,720.7],[305.1,719.5],[312.0,718.4],[318.9,717.2],[325.9,716.0],[332.8,714.7],[339.7,713.4],[346.6,712.2],[353.5,710.8],[360.4,709.5],[367.3,708.2],[374.2,706.8],[381.1,705.4],[388.0,704.0],[394.9,702.6],[401.8,701.1],[408.7,699.7],[415.6,698.2],[422.4,696.7],[429.3,695.2],[436.2,693.7],[443.1,692.1],[449.9,690.6],[456.8,689.0],[463.6,687.4],[470.5,685.8],[477.3,684.2],[484.2,682.6],[491.0,680.9],[497.9,679.3],[504.7,677.6],[511.5,675.9],[518.4,674.2],[525.2,672.5],[532.0,670.8],[538.8,669.1],[545.6,667.4],[552.5,665.6],[559.3,663.8],[566.1,662.1],[572.9,660.3],[579.7,658.5],[586.5,656.7],[593.3,654.9],[600.1,653.0],[606.9,651.2],[613.7,649.4],[620.5,647.5],[627.2,645.6],[634.0,643.8],[640.8,641.9],[647.6,640.0],[654.3,638.1],[661.1,636.2],[667.9,634.2],[674.6,632.3],[681.4,630.3],[688.2,628.4],[694.9,626.4],[701.7,624.5],[708.4,622.5],[715.2,620.5],[721.9,618.5],[728.7,616.5],[735.4,614.5],[742.1,612.4],[748.9,610.4],[755.6,608.4],[762.3,606.3],[769.1,604.2],[775.8,602.2],[782.5,600.1],[789.2,598.0],[796.0,595.9],[802.7,593.8],[809.4,591.7],[816.1,589.6],[822.8,587.5],[829.5,585.3],[836.2,583.2],[842.9,581.0],[849.6,578.9],[856.3,576.7],[863.0,574.5],[869.7,572.3],[876.4,570.1],[883.0,567.9],[889.7,565.7],[896.4,563.5],[903.1,561.3],[909.7,559.1],[916.4,556.8],[923.1,554.6],[929.7,552.3],[936.4,550.0],[943.1,547.8],[949.7,545.5],[956.4,543.2],[963.0,540.9],[969.7,538.6],[976.3,536.3],[983.0,534.0],[989.6,531.6],[996.2,529.3],[1002.9,527.0],[1009.5,524.6],[1016.1,522.3],[1022.8,519.9],[1029.4,517.5],[1036.0,515.1],[1042.6,512.7],[1049.2,510.3],[1055.8,507.9],[1062.5,505.5],[1069.1,503.1],[1075.7,500.6],[1082.3,498.2],[1088.9,495.8],[1095.4,493.3],[1102.0,490.8],[1108.6,488.3],[1115.2,485.9],[1121.8,483.4],[1128.4,480.9],[1134.9,478.4],[1141.5,475.8],[1148.1,473.3],[1154.6,470.8],[1161.2,468.2],[1167.7,465.7],[1174.3,463.1],[1180.9,460.5],[1187.4,458.0],[1193.9,455.4],[1200.5,452.8],[1207.0,450.2],[1213.5,447.6],[1220.1,444.9],[1226.6,442.3],[1233.1,439.6],[1239.6,437.0],[1246.1,434.3],[1252.6,431.6],[1259.2,429.0],[1265.7,426.3],[1272.1,423.6],[1278.6,420.8],[1285.1,418.1],[1291.6,415.4],[1298.1,412.6],[1304.6,409.9],[1311.0,407.1],[1317.5,404.3],[1323.9,401.5],[1330.4,398.7],[1336.8,395.9],[1343.3,393.1],[1349.7,390.3],[1356.2,387.4],[1362.6,384.5],[1369.0,381.7],[1375.4,378.8],[1381.8,375.9],[1388.2,373.0],[1394.6,370.0],[1401.0,367.1],[1407.4,364.1],[1413.8,361.2],[1420.2,358.2],[1426.5,355.2],[1432.9,352.2],[1439.2,349.1],[1445.6,346.1],[1451.9,343.0],[1458.2,339.9],[1464.6,336.9],[1470.9,333.7],[1477.2,330.6],[1483.5,327.5],[1489.7,324.3],[1496.0,321.1],[1502.3,317.9],[1508.5,314.7],[1514.8,311.4],[1521.0,308.1],[1527.2,304.9],[1533.4,301.5],[1539.6,298.2],[1545.8,294.8],[1552.0,291.4],[1558.1,288.0],[1564.2,284.6],[1570.4,281.1],[1576.4,277.6],[1582.5,274.0],[1588.6,270.4],[1594.6,266.8],[1600.6,263.2],[1606.6,259.5],[1612.6,255.7],[1618.5,252.0],[1624.4,248.1],[1630.3,244.3],[1636.1,240.3],[1641.9,236.3],[1647.7,232.2],[1653.3,228.1],[1659.0,223.9],[1664.5,219.6],[1670.0,215.2],[1675.5,210.7],[1680.8,206.1],[1685.9,201.3],[1691.0,196.4],[1695.8,191.3],[1700.4,186.0],[1704.7,180.4],[1708.5,174.5],[1711.6,168.2],[1713.7,161.5],[1714.0,154.5],[1712.0,147.7],[1707.9,142.1],[1702.4,137.7],[1696.2,134.4],[1689.6,131.9],[1682.9,129.9],[1676.0,128.4],[1669.1,127.3],[1662.1,126.4],[1655.1,125.7],[1648.1,125.2],[1641.0,124.9],[1634.0,124.7],[1627.0,124.7],[1619.9,124.7],[1612.9,124.9],[1605.9,125.1],[1598.8,125.5],[1591.8,125.9],[1584.8,126.3],[1577.8,126.9],[1570.8,127.5],[1563.8,128.1],[1556.8,128.8],[1549.8,129.6],[1542.8,130.4],[1535.8,131.2],[1528.8,132.1],[1521.8,133.0],[1514.8,133.9],[1507.9,134.9],[1500.9,135.9],[1494.0,137.0],[1487.0,138.1],[1480.1,139.2],[1473.1,140.3],[1466.2,141.5],[1459.2,142.7],[1452.3,143.9],[1445.4,145.1],[1438.5,146.4],[1431.5,147.6],[1424.6,149.0],[1417.7,150.3],[1410.8,151.6],[1403.9,152.9],[1397.0,154.2],[1390.0,155.4],[1383.1,156.5],[1376.1,157.6],[1369.2,158.6],[1362.2,159.5],[1355.2,160.3],[1348.2,161.1],[1341.2,161.9],[1334.2,162.5],[1327.2,163.1],[1320.2,163.6],[1313.2,164.1],[1306.2,164.5],[1299.1,164.9],[1292.1,165.2],[1285.1,165.4],[1278.0,165.6],[1271.0,165.8],[1264.0,165.9],[1256.9,165.9],[1249.9,165.9],[1242.9,165.9],[1235.8,165.8],[1228.8,165.6],[1221.7,165.4],[1214.7,165.2],[1207.7,165.0],[1200.7,164.7],[1193.6,164.4],[1186.6,164.0],[1179.6,163.6],[1172.5,163.2],[1165.5,162.8],[1158.5,162.3],[1151.5,161.8],[1144.5,161.3],[1137.5,160.8],[1130.4,160.3],[1123.4,159.7],[1116.4,159.2],[1109.4,158.6],[1102.4,158.0],[1095.4,157.4],[1088.4,156.8],[1081.3,156.3],[1074.3,155.7],[1067.3,155.1],[1060.3,154.5],[1053.3,153.9],[1046.3,153.3],[1039.3,152.7],[1032.3,152.2],[1025.3,151.6],[1018.2,151.1],[1011.2,150.6],[1004.2,150.1],[997.2,149.6],[990.2,149.1],[983.1,148.7],[976.1,148.3],[969.1,147.9],[962.1,147.5],[955.0,147.2],[948.0,146.9],[941.0,146.6],[933.9,146.4],[926.9,146.2],[919.9,146.0],[912.8,145.9],[905.8,145.8],[898.8,145.8],[891.7,145.7],[884.7,145.8],[877.7,145.9],[870.6,146.0],[863.6,146.2],[856.6,146.4],[849.5,146.7],[842.5,147.0]];
   const fx = document.getElementById('fx'), g = fx.getContext('2d'), logo = document.getElementById('logo'), img = document.getElementById('logoImg');
+  const starImg = new Image(); starImg.src = 'assets/logo-star-hi.png';
   let k = 1;
   function size() { const r = logo.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); fx.width = r.width * dpr; fx.height = r.height * dpr; k = fx.width / LW; }
-  const P = (t) => [E.cx + E.a * Math.cos(t) * Math.cos(E.rot) - E.b * Math.sin(t) * Math.sin(E.rot), E.cy + E.a * Math.cos(t) * Math.sin(E.rot) + E.b * Math.sin(t) * Math.cos(E.rot)];
-  // where the upper arc passes under the star
-  let tStar = 4.65; { let best = 1e9; for (let t = 3.4; t < 6.2; t += 0.001) { const [x] = P(t); if (Math.abs(x - STAR.x) < best) { best = Math.abs(x - STAR.x); tStar = t; } } }
-  const T0 = Math.PI + 0.35, T1 = tStar - 2 * Math.PI;      // bottom arc from the lower left, round the right end, back along the top
-  function star(x, y, r, alpha) {
-    g.save(); g.translate(x * k, y * k); g.globalAlpha = alpha;
-    const R = r * k, w = R * .22;
-    const glow = g.createRadialGradient(0, 0, 0, 0, 0, R * 1.6); glow.addColorStop(0, 'rgba(255,240,120,.55)'); glow.addColorStop(1, 'rgba(255,240,120,0)');
-    g.fillStyle = glow; g.beginPath(); g.arc(0, 0, R * 1.6, 0, 2 * Math.PI); g.fill();
-    g.fillStyle = '#f4ee1c'; g.beginPath(); g.moveTo(0, -R); g.quadraticCurveTo(w, -w, R, 0); g.quadraticCurveTo(w, w, 0, R); g.quadraticCurveTo(-w, w, -R, 0); g.quadraticCurveTo(-w, -w, 0, -R); g.fill();
+  const SEG = [0]; for (let i = 1; i < PATH.length; i++) SEG.push(SEG[i - 1] + Math.hypot(PATH[i][0] - PATH[i - 1][0], PATH[i][1] - PATH[i - 1][1]));
+  const LEN = SEG[SEG.length - 1];
+  function at(u) {                       // point and heading at fraction u of the path length
+    const d = Math.max(0, Math.min(1, u)) * LEN; let i = 1; while (i < SEG.length - 1 && SEG[i] < d) i++;
+    const f = (d - SEG[i - 1]) / (SEG[i] - SEG[i - 1] || 1), p = PATH[i - 1], q = PATH[i];
+    return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, Math.atan2(q[1] - p[1], q[0] - p[0])];
+  }
+  function star(scale, alpha) {
+    if (!starImg.complete) return;
+    const [bx, by, bw, bh] = STAR.box, w = bw * scale, h = bh * scale;
+    g.save(); g.globalAlpha = alpha;
+    const glow = g.createRadialGradient(STAR.x * k, STAR.y * k, 0, STAR.x * k, STAR.y * k, 90 * k * scale);
+    glow.addColorStop(0, 'rgba(255,240,120,.35)'); glow.addColorStop(1, 'rgba(255,240,120,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(STAR.x * k, STAR.y * k, 90 * k * scale, 0, 2 * Math.PI); g.fill();
+    g.drawImage(starImg, (STAR.x - w / 2 + (bx + bw / 2 - STAR.x) * scale) * k, (STAR.y - h / 2 + (by + bh / 2 - STAR.y) * scale) * k, w * k, h * k);
     g.restore();
   }
   function rocket(x, y, ang, s, flame) {
-    g.save(); g.translate(x * k, y * k); g.rotate(ang); g.scale(s * k / 2, s * k / 2);
+    g.save(); g.translate(x * k, y * k); g.rotate(ang); g.scale(s * k * 4, s * k * 4);
     if (flame > 0) { const fl = g.createLinearGradient(-14, 0, -4, 0); fl.addColorStop(0, 'rgba(255,120,30,0)'); fl.addColorStop(1, 'rgba(255,200,80,.95)');
       g.fillStyle = fl; g.beginPath(); g.moveTo(-4, -2.2); g.lineTo(-6 - 8 * flame, 0); g.lineTo(-4, 2.2); g.closePath(); g.fill(); }
-    g.fillStyle = '#e9f2f8'; g.beginPath(); g.moveTo(9, 0); g.quadraticCurveTo(5, -3.2, -4, -2.6); g.lineTo(-4, 2.6); g.quadraticCurveTo(5, 3.2, 9, 0); g.fill();
-    g.fillStyle = '#40e0d0'; g.beginPath(); g.arc(3, 0, 1.1, 0, 2 * Math.PI); g.fill();
-    g.fillStyle = '#9fb3c4'; g.beginPath(); g.moveTo(-1, -2.4); g.lineTo(-5, -5); g.lineTo(-4, -2.4); g.fill(); g.beginPath(); g.moveTo(-1, 2.4); g.lineTo(-5, 5); g.lineTo(-4, 2.4); g.fill();
+    // dark outline so the rocket stays visible while it runs along the white orbit
+    g.lineJoin = 'round'; g.strokeStyle = '#06121c'; g.lineWidth = 1.1;
+    g.fillStyle = '#ff7a3d'; g.beginPath(); g.moveTo(-1, -2.4); g.lineTo(-5, -5.2); g.lineTo(-4, -2.4); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(-1, 2.4); g.lineTo(-5, 5.2); g.lineTo(-4, 2.4); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#e9f2f8'; g.beginPath(); g.moveTo(9, 0); g.quadraticCurveTo(5, -3.2, -4, -2.6); g.lineTo(-4, 2.6); g.quadraticCurveTo(5, 3.2, 9, 0); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#ff7a3d'; g.beginPath(); g.moveTo(9, 0); g.quadraticCurveTo(7.6, -1.6, 6, -2.1); g.lineTo(6, 2.1); g.quadraticCurveTo(7.6, 1.6, 9, 0); g.fill();
+    g.fillStyle = '#40e0d0'; g.strokeStyle = '#06121c'; g.lineWidth = .6; g.beginPath(); g.arc(2.5, 0, 1.2, 0, 2 * Math.PI); g.fill(); g.stroke();
     g.restore();
   }
-  function drawFinal() { size(); g.clearRect(0, 0, fx.width, fx.height); star(STAR.x, STAR.y, STAR.r, 1); }
+  function drawFinal() { size(); g.clearRect(0, 0, fx.width, fx.height); star(1, 1); }
   function finish() { img.classList.add('on'); drawFinal(); setTimeout(() => document.getElementById('next').classList.add('on'), reduce ? 0 : 350); document.getElementById('next').focus({ preventScroll: true }); }
   if (reduce) { finish(); return; }
 
   size(); setTimeout(() => img.classList.add('on'), 250);
-  const D_RING = 3300, D_RISE = 700, D_IN = 650, trail = []; let t0 = null;
+  const D_PATH = 4800, D_IN = 750, trail = []; let t0 = null;
   const ease = (u) => u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
   function frame(now) {
     if (t0 === null) t0 = now; const el = now - t0; g.clearRect(0, 0, fx.width, fx.height);
-    let x, y, ang, s = 1, flame = 1, starA = 0, done = false;
-    if (el < D_RING) {
-      const u = ease(el / D_RING), t = T0 + (T1 - T0) * u; [x, y] = P(t); const [x2, y2] = P(t - 0.01); ang = Math.atan2((y2 - y) * k, (x2 - x) * k);
-    } else if (el < D_RING + D_RISE) {
-      const u = ease((el - D_RING) / D_RISE), [xa, ya] = P(T1); x = xa + (STAR.x - xa) * u; y = ya + (STAR.y - ya) * u; ang = Math.atan2(STAR.y - ya, STAR.x - xa);
-    } else if (el < D_RING + D_RISE + D_IN) {
-      const u = (el - D_RING - D_RISE) / D_IN; x = STAR.x; y = STAR.y; ang = -Math.PI / 2; s = 1 - u; flame = 1 - u; starA = u;
-    } else { done = true; }
-    if (done) { finish(); return; }
-    trail.push([x, y]); if (trail.length > 26) trail.shift();
-    for (let i = 1; i < trail.length; i++) { g.strokeStyle = `rgba(255,190,90,${(i / trail.length) * .55})`; g.lineWidth = Math.max(1, 1.6 * k * (i / trail.length)); g.beginPath(); g.moveTo(trail[i - 1][0] * k, trail[i - 1][1] * k); g.lineTo(trail[i][0] * k, trail[i][1] * k); g.stroke(); }
-    if (starA > 0) star(STAR.x, STAR.y, STAR.r * (0.4 + 0.6 * starA), starA);
+    let x, y, ang, s = 1, flame = 1, starA = 0;
+    if (el < D_PATH) { [x, y, ang] = at(ease(el / D_PATH)); }
+    else if (el < D_PATH + D_IN) {        // into the page: the rocket shrinks away at the star's place, the star grows in
+      const u = (el - D_PATH) / D_IN; [x, y, ang] = at(1); s = 1 - u; flame = 1 - u; starA = u;
+    } else { finish(); return; }
+    trail.push([x, y]); if (trail.length > 30) trail.shift();
+    for (let i = 1; i < trail.length; i++) { g.strokeStyle = `rgba(255,190,90,${(i / trail.length) * .55 * (1 - starA)})`; g.lineWidth = Math.max(1, 7 * k * (i / trail.length)); g.beginPath(); g.moveTo(trail[i - 1][0] * k, trail[i - 1][1] * k); g.lineTo(trail[i][0] * k, trail[i][1] * k); g.stroke(); }
+    if (starA > 0) star(0.3 + 0.7 * starA, starA);
     if (s > 0.02) rocket(x, y, ang, s, flame);
     requestAnimationFrame(frame);
   }

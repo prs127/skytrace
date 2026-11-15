@@ -135,6 +135,13 @@ and the export panel entered the page layout); the page jumped to the bottom on 
 page, not itself); the share link pointed at the welcome page instead of the dashboard. Reruns after the fixes:
 settings_sweep 72/72 × 3 targets, ui_test, new_ui_test, layout_ui_test, movers_parity 0 mismatches.
 
+### NASA IRSA outage, 15 Nov 2026 afternoon
+IRSA's front end returned "502 Proxy Error" for about half of all requests (SIA image search and TAP catalogues).
+Skytrace now retries every IRSA call with growing waits, never builds a field from a partial image list, rebuilds a
+field whose catalogue lookup failed the next time it is requested, and the moving-object check refuses to run if
+Gaia DR3 is missing (it needs Gaia stars to line up the visits and to label known stars). Pre-built targets do not
+depend on IRSA.
+
 ## 7. Ideas considered and not built (and why)
 - **Community database of candidates, ratings and favourites:** left out for this deadline (needs accounts, moderation
   and a persistent server; Cloud Run storage is temporary). Saved places and shared folder links cover personal use.

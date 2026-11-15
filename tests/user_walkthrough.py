@@ -20,7 +20,7 @@ async def main():
         T = "window.__skytrace"
 
         # ---- welcome -> home -> dashboard
-        await pg.goto(BASE); await pg.wait_for_timeout(6000)
+        await pg.goto(BASE); await pg.wait_for_timeout(8500)
         ok("welcome: Next appears after the animation", await pg.is_visible('#next') and await pg.evaluate("getComputedStyle(document.getElementById('next')).opacity") == '1')
         await pg.click('#next'); await pg.wait_for_load_state(); ok("welcome: Next opens Home", pg.url.endswith('home.html'), pg.url)
         ok("home: one primary button", await pg.locator('.st-hero .btn-info').count() == 1)

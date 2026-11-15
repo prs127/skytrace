@@ -21,6 +21,7 @@
 }
 
 /* ---------- ship hull background: deep space blue with a faint panel grid ---------- */
+html { background: #060a12; }
 body {
   background:
     radial-gradient(1200px 600px at 50% -10%, rgba(64, 224, 208, .07), transparent 60%),
@@ -227,7 +228,6 @@ body.embed { background: #05070b; }
 .card-header { padding-right: 2.2rem !important; }
 /* ---------- alternative image source over the viewer ---------- */
 .st-srcview { position: absolute; inset: 0; z-index: 4; background: #000; }
-.st-srcnote { position: absolute; left: 0; right: 0; bottom: 0; padding: .3rem .5rem; background: rgba(4, 12, 22, .85); color: #d7e3ee; z-index: 5; }
 
 /* =====================================================================================
    Console layout: search bar on top, then three panes that fill the window height.

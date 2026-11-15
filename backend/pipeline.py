@@ -16,6 +16,7 @@ import gzip
 import json
 import math
 import os
+import random
 import threading
 import time
 import warnings
@@ -100,20 +101,46 @@ def flag_names(value: int) -> list[str]:
 # --------------------------------------------------------------------------
 # Archive discovery and search
 # --------------------------------------------------------------------------
+KNOWN_COLLECTIONS = ("spherex_dr1", "spherex_dr1_deep", "spherex_qr3", "spherex_qr3_deep")
+_COLLECTIONS_CACHE = None
+
+
 def discover_collections() -> list[str]:
     """Return SPHEREx image collections currently served by IRSA SIA2.
 
     Newest data releases first; spectral cubes excluded (they are coadds,
     not time-resolved)."""
     from astroquery.ipac.irsa import Irsa
-    cols = [str(c) for c in Irsa.list_collections(servicetype="SIA", filter="spherex")["collection"]]
+    global _COLLECTIONS_CACHE
+    now = time.time()
+    if _COLLECTIONS_CACHE and now - _COLLECTIONS_CACHE[0] < 3600:
+        return list(_COLLECTIONS_CACHE[1])
+    cols, err = None, None
+    # IRSA's TAP front end returns intermittent "502 Proxy Error" (seen 15 Nov 2026: 2 of 3 calls).
+    for attempt in range(6):
+        try:
+            cols = [str(c) for c in Irsa.list_collections(servicetype="SIA", filter="spherex")["collection"]]
+            break
+        except Exception as exc:
+            err = exc
+            print(f"[warn] collection list attempt {attempt + 1}: {exc}")
+            time.sleep(1.5 * (attempt + 1))
+    if cols is None:
+        if _COLLECTIONS_CACHE:          # last list IRSA gave us in this server's lifetime
+            print("[warn] using cached SPHEREx collection list")
+            return list(_COLLECTIONS_CACHE[1])
+        # Collections IRSA listed on 15 Nov 2026; every one is still searched live with SIA2 below.
+        print(f"[warn] IRSA collection list unavailable ({err}); using the known SPHEREx collections")
+        return list(KNOWN_COLLECTIONS)   # not cached: the next search asks IRSA again
     cols = [c for c in cols if not c.endswith("_cube")]
 
     def rank(c):  # dr > qr, higher number first, wide before deep
         kind = 0 if "_dr" in c else 1
         num = int("".join(ch for ch in c.split("_")[1] if ch.isdigit()) or 0)
         return (kind, -num, "deep" in c)
-    return sorted(cols, key=rank)
+    cols = sorted(cols, key=rank)
+    _COLLECTIONS_CACHE = (now, cols)
+    return cols
 
 
 def query_exposures(ra: float, dec: float, collections: list[str]):
@@ -128,15 +155,17 @@ def query_exposures(ra: float, dec: float, collections: list[str]):
         # Retry transient network errors; if a collection still fails, stop rather than silently
         # building a field from partial data (found in verification: a dropped DR1 query left
         # Epsilon Indi B with 120 of its 458 exposures).
-        for attempt in range(4):
+        # IRSA's front end returned "502 Proxy Error" for about half of all requests on 15 Nov 2026, so allow 8 tries
+        for attempt in range(8):
             try:
                 t = Irsa.query_sia(pos=(c, 1 * u.arcsec), collection=coll)
                 break
             except Exception as exc:
                 print(f"[warn] SIA {coll} attempt {attempt + 1}: {exc}")
-                time.sleep(3 * (attempt + 1))
+                time.sleep(min(2 + 2 * attempt, 10) + random.random())
         else:
-            raise RuntimeError(f"IRSA SIA query for {coll} failed 4 times; not building a partial field")
+            raise RuntimeError(f"NASA IRSA's archive did not answer for {coll} after 8 tries (IRSA server error). "
+                               "Nothing was built from partial data; please try again in a few minutes.")
         if len(t):
             t = t[[k for k in ("obs_id", "energy_bandpassname", "t_min", "t_max", "em_min",
                                "em_max", "access_url", "cloud_access", "obs_collection")]]
@@ -572,7 +601,17 @@ def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0, top=40
              f"FROM fp_psc WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
              f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND k_m < {kmax} ORDER BY k_m"),
     }
-    futs = {k: _TAP_POOL.submit(lambda q=q: tap.run_sync(q).to_table()) for k, q in queries.items()}
+    def run(q):   # IRSA TAP gives intermittent "502 Proxy Error"; retry transient failures, stay inside TAP_TIMEOUT
+        t0 = time.time()
+        for attempt in range(8):
+            try:
+                return tap.run_sync(q).to_table()
+            except Exception as exc:
+                if attempt == 7 or time.time() - t0 > TAP_TIMEOUT - 20:
+                    raise
+                print(f"[warn] TAP attempt {attempt + 1}: {exc}")
+                time.sleep(2 * (attempt + 1))
+    futs = {k: _TAP_POOL.submit(run, q) for k, q in queries.items()}
     out["warnings"] = []
     try:
         for r in futs["gaia"].result(timeout=TAP_TIMEOUT):

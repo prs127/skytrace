@@ -27,7 +27,7 @@
       <select id="sizeSel" class="form-select st-size" aria-label="Field size for a new archive search" title="Field size for a new search. Bigger fields can follow faster-moving objects but take longer to download.">
         <option value="9" selected>9′ field</option><option value="15">15′ field (slower)</option><option value="20">20′ field (slowest)</option>
       </select>
-      <button id="goBtn" class="btn btn-primary">Search</button>
+      <button id="goBtn" class="btn btn-primary" title="Find the target or position and open its SPHEREx images">Search</button>
     </div>
     <div id="coordMsg" class="st-search-msg small"></div>
   </div>
@@ -56,7 +56,7 @@
           <div class="small text-secondary px-2 pb-1">Largest motion in Gaia DR3 (over 3″/yr).</div>
           <ul class="st-list" id="libFast"></ul></details>
         <details class="st-folder" open id="savedFolder"><summary>Saved places <span class="st-count" id="libCountSaved"></span></summary>
-          <div class="px-2 pb-1 d-flex gap-1 flex-wrap"><button class="btn btn-sm btn-outline-info py-0" type="button" id="newFolderBtn">+ New folder</button></div>
+          <div class="px-2 pb-1 d-flex gap-1 flex-wrap"><button class="btn btn-sm btn-outline-info py-0" type="button" id="newFolderBtn" title="Make a new folder for saved places">+ New folder</button></div>
           <div id="libSaved"></div></details>
         <details class="st-folder" open><summary>Your searches <span class="st-count" id="libCountMine"></span></summary>
           <div class="small text-secondary px-2 pb-1" id="libMineEmpty">Places you search appear here. Names you give them stay in this browser.</div>
@@ -86,6 +86,7 @@
           <input type="radio" class="btn-check" name="src" id="src-wise" value="allwise"><label class="btn btn-outline-light" for="src-wise" title="AllWISE W1/W2/W4 mid-infrared, 2010–2011 (HiPS hosted by NASA IRSA)">AllWISE</label>
         </div>
       </div>
+      <button class="btn btn-sm btn-outline-secondary d-none st-sheet-show" id="sheetShow" type="button" title="Show the analysis panel" aria-controls="sheet">« Analysis</button>
     </div>
 
     <div class="st-layers" role="group" aria-label="Layers drawn on the image" data-help="overlays">
@@ -105,7 +106,7 @@
           <div class="st-viewer" id="viewerWrap">
             <canvas id="imgCanvas"></canvas>
             <canvas id="ovCanvas"></canvas>
-            <div id="srcView" class="st-srcview d-none"><div id="srcAladin" style="width:100%;height:100%"></div><div id="srcNote" class="st-srcnote small"></div></div>
+            <div id="srcView" class="st-srcview d-none"><div id="srcAladin" style="width:100%;height:100%"></div></div>
             <div id="loadingVeil" class="st-veil"><canvas id="veilSky" class="st-veilsky" aria-hidden="true"></canvas><div class="d-flex align-items-center gap-2 mt-2"><div class="spinner-border spinner-border-sm text-info" role="status"></div><div id="loadingText" class="small" role="status" aria-live="polite">Loading SPHEREx data…</div></div></div>
           </div>
         </div>
@@ -124,6 +125,11 @@
       </div>
       <aside class="st-imgside" aria-label="Frame details">
         <div class="st-caption"><div id="frameLabel" class="fw-semibold"></div><div id="frameSub" class="text-secondary small"></div></div>
+        <div class="st-srccard d-none" id="srcCard">
+          <div class="st-sec-title" id="srcTitle">Comparison image</div>
+          <div class="small" id="srcNote"></div>
+          <button class="btn btn-sm btn-outline-info w-100 mt-2" type="button" id="srcBack" title="Return to the SPHEREx frames">Back to the SPHEREx frames</button>
+        </div>
     <div class="st-toolbar st-viewcard" data-help="view">
       <div class="st-sec-title">What each frame shows</div>
       <div class="btn-group btn-group-sm flex-wrap" role="group" id="modeGroup" aria-label="What each frame shows">
@@ -148,31 +154,31 @@
       </select></div>
       <select id="fovSel" class="form-select form-select-sm st-tsel" aria-label="Field of view shown" title="How much of the field to show (zoom)"></select>
       <div class="dropdown">
-        <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="displayBtn">Display</button>
+        <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="displayBtn" title="Brightness stretch, colours, black and white points, smoothing">Display</button>
         <div class="dropdown-menu dropdown-menu-end p-3 st-displaymenu" data-help="display">
           <div class="row g-2">
             <div class="col-6"><label class="form-label small text-secondary mb-1" for="stretchSel">Stretch</label>
-              <select id="stretchSel" class="form-select form-select-sm"><option value="asinh">asinh</option><option value="linear">linear</option><option value="sqrt">sqrt</option><option value="log">log</option></select></div>
+              <select id="stretchSel" class="form-select form-select-sm" title="How pixel values map to brightness: asinh shows faint and bright stars together"><option value="asinh">asinh</option><option value="linear">linear</option><option value="sqrt">sqrt</option><option value="log">log</option></select></div>
             <div class="col-6"><label class="form-label small text-secondary mb-1" for="cmapSel">Colour map</label>
-              <select id="cmapSel" class="form-select form-select-sm"><option value="gray">grey</option><option value="inferno">inferno</option><option value="viridis">viridis</option><option value="div">blue-red (differences)</option></select></div>
-            <div class="col-6"><label class="form-label small text-secondary mb-1">Black point % <span id="loLabel"></span></label><input type="range" class="form-range" id="loRange" min="0" max="20" step="0.5"></div>
-            <div class="col-6"><label class="form-label small text-secondary mb-1">White point % <span id="hiLabel"></span></label><input type="range" class="form-range" id="hiRange" min="90" max="100" step="0.1"></div>
+              <select id="cmapSel" class="form-select form-select-sm" title="Colours used for the image; blue-red suits difference images"><option value="gray">grey</option><option value="inferno">inferno</option><option value="viridis">viridis</option><option value="div">blue-red (differences)</option></select></div>
+            <div class="col-6"><label class="form-label small text-secondary mb-1">Black point % <span id="loLabel"></span></label><input type="range" class="form-range" id="loRange" min="0" max="20" step="0.5" title="Pixels darker than this percentile are shown black"></div>
+            <div class="col-6"><label class="form-label small text-secondary mb-1">White point % <span id="hiLabel"></span></label><input type="range" class="form-range" id="hiRange" min="90" max="100" step="0.1" title="Pixels brighter than this percentile are shown white"></div>
           </div>
-          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="invToggle"><label class="form-check-label" for="invToggle">Invert (dark stars on white)</label></div>
-          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="smoothToggle"><label class="form-check-label" for="smoothToggle">Smooth pixels</label></div>
-          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="flatToggle" checked><label class="form-check-label" for="flatToggle">Flatten background</label></div>
-          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="lockScale" checked><label class="form-check-label" for="lockScale">Same brightness scale for every frame</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="invToggle"><label class="form-check-label" for="invToggle" title="Dark stars on a white background">Invert (dark stars on white)</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="smoothToggle"><label class="form-check-label" for="smoothToggle" title="Blur pixel edges (display only)">Smooth pixels</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="flatToggle" checked><label class="form-check-label" for="flatToggle" title="Remove large-scale background gradients (display only)">Flatten background</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="lockScale" checked><label class="form-check-label" for="lockScale" title="Use one brightness scale so frames can be compared fairly">Same brightness scale for every frame</label></div>
         </div>
       </div>
     </div>
     <div class="st-modeopts">
       <div id="bandCtl" class="d-none">
         <label class="form-label small text-secondary mb-0">Channel <span id="bandLabel" class="text-light"></span></label>
-        <input type="range" class="form-range" id="bandRange" min="1" max="102" step="1">
+        <input type="range" class="form-range" id="bandRange" min="1" max="102" step="1" title="Wavelength channel compared across visits (1 = 0.75 µm, 102 = 5.0 µm)">
         <label class="form-label small text-secondary mb-0">Channel tolerance ± <span id="tolLabel"></span></label>
-        <input type="range" class="form-range" id="tolRange" min="0" max="8" step="1">
+        <input type="range" class="form-range" id="tolRange" min="0" max="8" step="1" title="Also accept channels this many steps either side, to find more matching exposures">
       </div>
-      <div id="scanCtl" class="d-none"><label class="form-label small text-secondary mb-1" for="scanEpoch">Visit to scan</label><select id="scanEpoch" class="form-select form-select-sm"></select></div>
+      <div id="scanCtl" class="d-none"><label class="form-label small text-secondary mb-1" for="scanEpoch">Visit to scan</label><select id="scanEpoch" class="form-select form-select-sm" title="Which visit to play through its wavelength channels"></select></div>
       <div id="customCtl" class="d-none"><div class="small text-secondary mb-1">Tick visits for A (added together) and B (subtracted). Leave B empty to just add A.</div><div id="customList" class="small"></div></div>
     </div>
 
@@ -194,23 +200,23 @@
   <section class="st-pane st-data" id="sheet" aria-label="Analysis">
     <div class="st-pane-head"><span>Analysis</span><button class="btn btn-sm btn-outline-secondary py-0 px-2" id="sheetToggle" type="button" title="Hide the analysis panel" aria-controls="sheet" aria-expanded="true">»</button></div>
     <ul class="nav nav-tabs st-data-tabs" role="tablist">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabSpec" type="button" role="tab">Spectrum</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLc" type="button" role="tab">Light curve</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMovers" type="button" role="tab">Moving objects</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabExp" type="button" role="tab">Exposures <span id="expCount" class="st-count"></span></button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAladin" type="button" role="tab">Atlas</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSettings" type="button" role="tab">Visits</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabShare" type="button" role="tab" id="tabShareBtn">Share</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabData" type="button" role="tab">Sources</button></li>
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabSpec" type="button" role="tab" title="Brightness against wavelength at the target, every exposure">Spectrum</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLc" type="button" role="tab" title="Brightness over time, each channel divided by its own median">Light curve</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMovers" type="button" role="tab" title="Objects moving in a straight line across the visits, and shift-and-add">Moving objects</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabExp" type="button" role="tab" title="Every exposure on screen, its flags and a link to the original file">Exposures <span id="expCount" class="st-count"></span></button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAladin" type="button" role="tab" title="Zoomable all-sky map: SPHEREx channel maps or older surveys">Atlas</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSettings" type="button" role="tab" title="How exposures are grouped into visits">Visits</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabShare" type="button" role="tab" title="Links, embed code, PNG, CSV and candidate report" id="tabShareBtn">Share</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabData" type="button" role="tab" title="Where the data came from and when this field was built">Sources</button></li>
     </ul>
     <div class="tab-content st-data-body">
       <div class="tab-pane fade show active" id="tabSpec" role="tabpanel" data-help="spectrum">
         <div id="specPlot" class="st-plot"></div>
         <div class="d-flex gap-3 flex-wrap">
-          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specLog"><label class="form-check-label" for="specLog">Log flux axis</label></div>
-          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specClean" checked><label class="form-check-label" for="specClean">Hide points with flagged pixels</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specLog"><label class="form-check-label" for="specLog" title="Logarithmic flux axis: shows faint and bright points together">Log flux axis</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specClean" checked><label class="form-check-label" for="specClean" title="Leave out measurements with a flagged pixel in the aperture">Hide points with flagged pixels</label></div>
         </div>
-        <div class="small text-info" id="specNote"></div>
+        <div class="small text-secondary" id="specNote"></div>
         <details class="st-about"><summary>About this plot</summary>Built on the fly from every exposure: the target is measured on the original detector pixels at its predicted position, with the IRSA SPHEREx Source Discovery Tool method (3-pixel aperture, ePSF-corrected). Points whose aperture holds a flagged pixel are hidden unless you switch them on. White diamonds: 2MASS J, H, Ks. Orange squares: WISE W1, W2 (CatWISE2020), matched at each catalogue's own date.</details>
       </div>
       <div class="tab-pane fade" id="tabLc" role="tabpanel" data-help="lightcurve">
@@ -223,11 +229,11 @@
         <hr class="my-2">
         <div class="st-sec-title">Shift-and-add</div>
         <details class="st-about mb-1"><summary>What it does</summary>Slide every exposure along a chosen motion before stacking (as in WiseView): an object moving that way stays still and builds up into a sharp dot, everything else smears. Use it to confirm a faint candidate.</details>
-        <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="saToggle"><label class="form-check-label" for="saToggle">Shift-and-add along this motion</label></div>
+        <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="saToggle"><label class="form-check-label" for="saToggle" title="Shift each exposure along the trial motion so a mover with that motion stays still and adds up">Shift-and-add along this motion</label></div>
         <div class="row g-1 mb-1 align-items-center small">
-          <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µα*</span><input id="saPmra" class="form-control" type="number" step="10" aria-label="Proper motion in RA, mas/yr"></div></div>
-          <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µδ</span><input id="saPmdec" class="form-control" type="number" step="10" aria-label="Proper motion in Dec, mas/yr"></div></div>
-          <div class="col-12 d-flex justify-content-between"><span class="text-secondary">mas/yr (1000 mas = 1″)</span><button class="btn btn-sm btn-outline-secondary py-0" id="saTarget" type="button">use the target's motion</button></div>
+          <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µα*</span><input id="saPmra" class="form-control" type="number" step="10" aria-label="Proper motion in RA, mas/yr" title="Trial motion east-west in mas/yr (1000 mas = 1″)"></div></div>
+          <div class="col-6"><div class="input-group input-group-sm"><span class="input-group-text">µδ</span><input id="saPmdec" class="form-control" type="number" step="10" aria-label="Proper motion in Dec, mas/yr" title="Trial motion north-south in mas/yr"></div></div>
+          <div class="col-12 d-flex justify-content-between"><span class="text-secondary">mas/yr (1000 mas = 1″)</span><button class="btn btn-sm btn-outline-secondary py-0" id="saTarget" type="button" title="Fill in the target's catalogue motion">use the target's motion</button></div>
         </div>
       </div>
       <div class="tab-pane fade" id="tabExp" role="tabpanel" data-help="exposures">
@@ -250,20 +256,20 @@
       <div class="tab-pane fade" id="tabSettings" role="tabpanel" data-help="settings">
         <details class="st-about mb-2"><summary>What is a visit?</summary>A group of exposures taken close together in time; SPHEREx comes back to each place about every six months. These two settings decide how exposures are grouped into the frames you blink.</details>
         <label class="form-label small text-secondary mb-1">Start a new visit after a gap of <span id="winLabel"></span> days</label>
-        <input type="range" class="form-range" id="winRange" min="2" max="120" step="1">
+        <input type="range" class="form-range" id="winRange" min="2" max="120" step="1" title="A gap longer than this (days) between exposures starts a new visit">
         <label class="form-label small text-secondary mb-1">…and split visits longer than <span id="spanLabel"></span> days</label>
-        <input type="range" class="form-range" id="spanRange" min="5" max="400" step="5">
+        <input type="range" class="form-range" id="spanRange" min="5" max="400" step="5" title="A visit longer than this (days) is split in two">
       </div>
       <div class="tab-pane fade" id="tabShare" role="tabpanel" data-help="share">
         <label class="form-label small text-secondary mb-1" for="shareUrl">Link to this exact view (coordinates and settings are in the URL)</label>
-        <input id="shareUrl" class="form-control form-control-sm font-monospace mb-2" readonly>
+        <input id="shareUrl" class="form-control form-control-sm font-monospace mb-2" readonly title="Link that reopens this exact view">
         <div class="d-grid gap-2 st-share-grid">
-          <button class="btn btn-sm btn-outline-info" id="copyLinkBtn">Copy link</button>
-          <button class="btn btn-sm btn-outline-info" id="copyEmbedBtn">Copy embed code</button>
-          <button class="btn btn-sm btn-outline-secondary" id="copyCoordBtn">Copy centre RA/Dec</button>
-          <button class="btn btn-sm btn-outline-info" id="saveImgBtn">Save image (PNG)</button>
-          <button class="btn btn-sm btn-outline-info" id="saveCsvBtn">Download data (CSV)</button>
-          <button class="btn btn-sm btn-warning" id="reportBtn" data-bs-toggle="modal" data-bs-target="#reportModal">Report a candidate</button>
+          <button class="btn btn-sm btn-outline-info" id="copyLinkBtn" title="Copy a link that reopens this exact view">Copy link</button>
+          <button class="btn btn-sm btn-outline-info" id="copyEmbedBtn" title="Copy HTML code to show this view inside another web page">Copy embed code</button>
+          <button class="btn btn-sm btn-outline-secondary" id="copyCoordBtn" title="Copy the field centre RA and Dec">Copy centre RA/Dec</button>
+          <button class="btn btn-sm btn-outline-info" id="saveImgBtn" title="Save the frame on screen with its layers as a PNG picture">Save image (PNG)</button>
+          <button class="btn btn-sm btn-outline-info" id="saveCsvBtn" title="Download the spectrum measurements as a spreadsheet file (CSV)">Download data (CSV)</button>
+          <button class="btn btn-sm btn-warning" id="reportBtn" data-bs-toggle="modal" data-bs-target="#reportModal" title="Write up a pinned candidate in the format citizen-science projects ask for">Report a candidate</button>
         </div>
         <div id="shareMsg" class="form-text small"></div>
       </div>
@@ -271,7 +277,6 @@
     </div>
   </section>
 </div>
-<button class="btn btn-sm btn-outline-secondary d-none st-sheet-show" id="sheetShow" type="button" title="Show the analysis panel" aria-controls="sheet">« Analysis</button>
 
 <!-- Export side panel -->
 <div class="offcanvas offcanvas-end st-export" tabindex="-1" id="exportPanel" aria-labelledby="exportTitle">
@@ -300,9 +305,9 @@
       <label class="d-block mb-1" for="exportNotes">Notes</label>
       <textarea id="exportNotes" class="form-control form-control-sm" rows="3" maxlength="2000" placeholder="What did you find?"></textarea></div>
     <div class="st-exgroup"><label><input type="checkbox" data-ex="sources" checked> Data sources and credits</label></div>
-    <div class="d-flex gap-2 mt-2"><button class="btn btn-sm btn-outline-secondary" type="button" id="exportAll">Select all</button><button class="btn btn-sm btn-outline-secondary" type="button" id="exportNone">Clear</button></div>
+    <div class="d-flex gap-2 mt-2"><button class="btn btn-sm btn-outline-secondary" type="button" id="exportAll" title="Tick every section">Select all</button><button class="btn btn-sm btn-outline-secondary" type="button" id="exportNone" title="Untick every section">Clear</button></div>
   </div>
-  <div class="st-export-foot"><div id="exportMsg" class="small text-secondary mb-1"></div><button class="btn btn-info w-100" type="button" id="exportGo">Download PDF</button></div>
+  <div class="st-export-foot"><div id="exportMsg" class="small text-secondary mb-1"></div><button class="btn btn-info w-100" type="button" id="exportGo" title="Build the PDF for this place with the ticked sections">Download PDF</button></div>
 </div>
 
 <!-- Save place modal -->
@@ -320,7 +325,7 @@
       <textarea id="saveNote" class="form-control form-control-sm" rows="2" maxlength="300" placeholder="What is interesting here?"></textarea>
       <div class="form-text">Saved places stay in this browser. Share a folder with its ⤴ button.</div>
     </div>
-    <div class="modal-footer"><button class="btn btn-sm btn-info" id="saveConfirm">Save</button></div>
+    <div class="modal-footer"><button class="btn btn-sm btn-info" id="saveConfirm" title="Save to the chosen folder">Save</button></div>
   </div></div>
 </div>
 
@@ -343,7 +348,7 @@
       <textarea id="reportText" class="form-control form-control-sm font-monospace" rows="14" spellcheck="false"></textarea>
       <div id="reportMsg" class="form-text small"></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-sm btn-outline-info" id="reportCopy">Copy report</button><button class="btn btn-sm btn-info" id="reportDownload">Download .txt</button></div>
+    <div class="modal-footer"><button class="btn btn-sm btn-outline-info" id="reportCopy" title="Copy the report text">Copy report</button><button class="btn btn-sm btn-info" id="reportDownload" title="Download the report as a text file">Download .txt</button></div>
   </div></div>
 </div>
 
