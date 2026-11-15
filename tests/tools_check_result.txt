@@ -1,0 +1,350 @@
+== wise0855
+  PASS wise0855     field opens  [258 images]
+  PASS wise0855     visits: same grouping as Python  [3 visits]
+  PASS wise0855     spectrum: every clean measurement plotted, values exact  [193 points]
+  PASS wise0855     spectrum: flagged ones added when the switch is off  [258]
+  PASS wise0855     light curve: every usable point plotted, value = flux / channel median  [102 points, scatter 0.126]
+  PASS wise0855     moving objects: browser = independent Python (same objects, same motions)  [1 reported, error floor 0.150/0.150 px]
+  PASS wise0855     moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+      mover 7.21 ± 1.39"/yr, 5.2 sigma, 3/3 visits, target
+  PASS wise0855     exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [11 rows / 11 images]
+  PASS wise0855     sources tab: image count and collections
+  PASS wise0855     mode band: frames built  [2]
+  PASS wise0855     mode scan: frames built  [11]
+  PASS wise0855     mode exp: frames built  [93]
+  PASS wise0855     mode custom: frames built  [1]
+  PASS wise0855     mode epoch: frames built  [3]
+  PASS wise0855     difference frames
+  PASS wise0855     shift-and-add with the target's motion
+  PASS wise0855     CSV: one row per SPHEREx image
+  PASS wise0855     candidate report written
+  PASS wise0855     Atlas loads with the 100 SPHEREx channel maps
+  PASS wise0855     compare with 2MASS
+  PASS wise0855     PDF export, every section  [12 pages]
+  PASS wise0855     no page errors
+== barnard
+  PASS barnard      field opens  [358 images]
+  PASS barnard      visits: same grouping as Python  [3 visits]
+  PASS barnard      spectrum: every clean measurement plotted, values exact  [0 points]
+  PASS barnard      spectrum: flagged ones added when the switch is off  [358]
+  PASS barnard      light curve: none possible, and the tab says why  [Barnard's Star is too bright for SPHEREx: 357 of its 358 measurements are saturated (the brightest pixels exce]
+  PASS barnard      moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.047/0.047 px]
+  PASS barnard      moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS barnard      exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [118 rows / 118 images]
+  PASS barnard      sources tab: image count and collections
+  PASS barnard      mode band: frames built  [3]
+  PASS barnard      mode scan: frames built  [101]
+  PASS barnard      mode exp: frames built  [358]
+  PASS barnard      mode custom: frames built  [1]
+  PASS barnard      mode epoch: frames built  [3]
+  PASS barnard      difference frames
+  PASS barnard      shift-and-add with the target's motion
+  PASS barnard      CSV: one row per SPHEREx image
+  PASS barnard      candidate report written
+  PASS barnard      Atlas loads with the 100 SPHEREx channel maps
+  PASS barnard      compare with 2MASS
+  PASS barnard      PDF export, every section  [14 pages]
+  PASS barnard      no page errors
+== epsindib
+  PASS epsindib     field opens  [458 images]
+  PASS epsindib     visits: same grouping as Python  [4 visits]
+  PASS epsindib     spectrum: every clean measurement plotted, values exact  [300 points]
+  PASS epsindib     spectrum: flagged ones added when the switch is off  [458]
+  PASS epsindib     light curve: every usable point plotted, value = flux / channel median  [265 points, scatter 0.085]
+  PASS epsindib     moving objects: browser = independent Python (same objects, same motions)  [1 reported, error floor 0.116/0.116 px]
+  PASS epsindib     moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+      mover 4.51 ± 0.68"/yr, 6.6 sigma, 4/4 visits, target (catalogue 4.68)
+  PASS epsindib       known star's measured motion agrees with Gaia within 3 sigma
+  PASS epsindib     exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [118 rows / 118 images]
+  PASS epsindib     sources tab: image count and collections
+  PASS epsindib     mode band: frames built  [3]
+  PASS epsindib     mode scan: frames built  [66]
+  PASS epsindib     mode exp: frames built  [458]
+  PASS epsindib     mode custom: frames built  [1]
+  PASS epsindib     mode epoch: frames built  [4]
+  PASS epsindib     difference frames
+  PASS epsindib     shift-and-add with the target's motion
+  PASS epsindib     CSV: one row per SPHEREx image
+  PASS epsindib     candidate report written
+  PASS epsindib     Atlas loads with the 100 SPHEREx channel maps
+  PASS epsindib     compare with 2MASS
+  PASS epsindib     PDF export, every section  [17 pages]
+  PASS epsindib     no page errors
+== rwaur
+  PASS rwaur        field opens  [335 images]
+  PASS rwaur        visits: same grouping as Python  [3 visits]
+  PASS rwaur        spectrum: every clean measurement plotted, values exact  [17 points]
+  PASS rwaur        spectrum: flagged ones added when the switch is off  [333]
+  PASS rwaur        light curve: every usable point plotted, value = flux / channel median  [8 points, scatter 0.321]
+  PASS rwaur        moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.077/0.077 px]
+  PASS rwaur        moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS rwaur        exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [112 rows / 112 images]
+  PASS rwaur        sources tab: image count and collections
+  PASS rwaur        mode band: frames built  [3]
+  PASS rwaur        mode scan: frames built  [102]
+  PASS rwaur        mode exp: frames built  [335]
+  PASS rwaur        mode custom: frames built  [1]
+  PASS rwaur        mode epoch: frames built  [3]
+  PASS rwaur        difference frames
+  PASS rwaur        shift-and-add with the target's motion
+  PASS rwaur        CSV: one row per SPHEREx image
+  PASS rwaur        candidate report written
+  PASS rwaur        Atlas loads with the 100 SPHEREx channel maps
+  PASS rwaur        compare with 2MASS
+  PASS rwaur        PDF export, every section  [14 pages]
+  PASS rwaur        no page errors
+== rdra
+  PASS rdra         field opens  [700 images]
+  PASS rdra         visits: same grouping as Python  [9 visits]
+  PASS rdra         spectrum: every clean measurement plotted, values exact  [0 points]
+  PASS rdra         spectrum: flagged ones added when the switch is off  [692]
+  PASS rdra         light curve: none possible, and the tab says why  [R Draconis is too bright for SPHEREx: 692 of its 692 measurements are saturated (the brightest pixels exceed w]
+  PASS rdra         moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.311/0.311 px]
+  PASS rdra         moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS rdra         exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [34 rows / 34 images]
+  PASS rdra         sources tab: image count and collections
+  PASS rdra         mode band: frames built  [4]
+  PASS rdra         mode scan: frames built  [19]
+  PASS rdra         mode exp: frames built  [700]
+  PASS rdra         mode custom: frames built  [1]
+  PASS rdra         mode epoch: frames built  [9]
+  PASS rdra         difference frames
+  PASS rdra         shift-and-add with the target's motion
+  PASS rdra         CSV: one row per SPHEREx image
+  PASS rdra         candidate report written
+  PASS rdra         Atlas loads with the 100 SPHEREx channel maps
+  PASS rdra         compare with 2MASS
+  PASS rdra         PDF export, every section  [23 pages]
+  PASS rdra         no page errors
+== m101
+  PASS m101         field opens  [376 images]
+  PASS m101         visits: same grouping as Python  [3 visits]
+  PASS m101         spectrum: every clean measurement plotted, values exact  [270 points]
+  PASS m101         spectrum: flagged ones added when the switch is off  [376]
+  PASS m101         light curve: every usable point plotted, value = flux / channel median  [251 points, scatter 0.016]
+  PASS m101         moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.147/0.147 px]
+  PASS m101         moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS m101         exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [26 rows / 26 images]
+  PASS m101         sources tab: image count and collections
+  PASS m101         mode band: frames built  [3]
+  PASS m101         mode scan: frames built  [17]
+  PASS m101         mode exp: frames built  [84]
+  PASS m101         mode custom: frames built  [1]
+  PASS m101         mode epoch: frames built  [3]
+  PASS m101         difference frames
+  PASS m101         shift-and-add with the target's motion
+  PASS m101         CSV: one row per SPHEREx image
+  PASS m101         candidate report written
+  PASS m101         Atlas loads with the 100 SPHEREx channel maps
+  PASS m101         compare with 2MASS
+  PASS m101         PDF export, every section  [15 pages]
+  PASS m101         no page errors
+== f3364d07337
+  PASS f3364d07337  field opens  [358 images]
+  PASS f3364d07337  visits: same grouping as Python  [3 visits]
+  PASS f3364d07337  spectrum: every clean measurement plotted, values exact  [286 points]
+  PASS f3364d07337  spectrum: flagged ones added when the switch is off  [355]
+  PASS f3364d07337  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS f3364d07337  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.040/0.040 px]
+  PASS f3364d07337  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS f3364d07337  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [132 rows / 132 images]
+  PASS f3364d07337  sources tab: image count and collections
+  PASS f3364d07337  mode band: frames built  [3]
+  PASS f3364d07337  mode scan: frames built  [102]
+  PASS f3364d07337  mode exp: frames built  [358]
+  PASS f3364d07337  mode custom: frames built  [1]
+  PASS f3364d07337  mode epoch: frames built  [3]
+  PASS f3364d07337  difference frames
+  PASS f3364d07337  shift-and-add with the target's motion
+  PASS f3364d07337  CSV: one row per SPHEREx image
+  PASS f3364d07337  candidate report written
+  PASS f3364d07337  Atlas loads with the 100 SPHEREx channel maps
+  PASS f3364d07337  compare with 2MASS
+  PASS f3364d07337  PDF export, every section  [14 pages]
+  PASS f3364d07337  no page errors
+== f321532148f
+  PASS f321532148f  field opens  [356 images]
+  PASS f321532148f  visits: same grouping as Python  [3 visits]
+  PASS f321532148f  spectrum: every clean measurement plotted, values exact  [262 points]
+  PASS f321532148f  spectrum: flagged ones added when the switch is off  [354]
+  PASS f321532148f  light curve: every usable point plotted, value = flux / channel median  [10 points, scatter 0.169]
+  PASS f321532148f  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.056/0.056 px]
+  PASS f321532148f  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS f321532148f  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [117 rows / 117 images]
+  PASS f321532148f  sources tab: image count and collections
+  PASS f321532148f  mode band: frames built  [3]
+  PASS f321532148f  mode scan: frames built  [102]
+  PASS f321532148f  mode exp: frames built  [356]
+  PASS f321532148f  mode custom: frames built  [1]
+  PASS f321532148f  mode epoch: frames built  [3]
+  PASS f321532148f  difference frames
+  PASS f321532148f  shift-and-add with the target's motion
+  PASS f321532148f  CSV: one row per SPHEREx image
+  PASS f321532148f  candidate report written
+  PASS f321532148f  Atlas loads with the 100 SPHEREx channel maps
+  PASS f321532148f  compare with 2MASS
+  PASS f321532148f  PDF export, every section  [14 pages]
+  PASS f321532148f  no page errors
+== ff5175c790b
+  PASS ff5175c790b  field opens  [434 images]
+  PASS ff5175c790b  visits: same grouping as Python  [3 visits]
+  PASS ff5175c790b  spectrum: every clean measurement plotted, values exact  [349 points]
+  PASS ff5175c790b  spectrum: flagged ones added when the switch is off  [433]
+  PASS ff5175c790b  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS ff5175c790b  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.030/0.030 px]
+  PASS ff5175c790b  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS ff5175c790b  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [151 rows / 169 images]
+  PASS ff5175c790b  sources tab: image count and collections
+  PASS ff5175c790b  mode band: frames built  [3]
+  PASS ff5175c790b  mode scan: frames built  [102]
+  PASS ff5175c790b  mode exp: frames built  [434]
+  PASS ff5175c790b  mode custom: frames built  [1]
+  PASS ff5175c790b  mode epoch: frames built  [3]
+  PASS ff5175c790b  difference frames
+  PASS ff5175c790b  shift-and-add with the target's motion
+  PASS ff5175c790b  CSV: one row per SPHEREx image
+  PASS ff5175c790b  candidate report written
+  PASS ff5175c790b  Atlas loads with the 100 SPHEREx channel maps
+  PASS ff5175c790b  compare with 2MASS
+  PASS ff5175c790b  PDF export, every section  [16 pages]
+  PASS ff5175c790b  no page errors
+== ff84cb064d3
+  PASS ff84cb064d3  field opens  [248 images]
+  PASS ff84cb064d3  visits: same grouping as Python  [3 visits]
+  PASS ff84cb064d3  spectrum: every clean measurement plotted, values exact  [195 points]
+  PASS ff84cb064d3  spectrum: flagged ones added when the switch is off  [246]
+  PASS ff84cb064d3  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS ff84cb064d3  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.036/0.036 px]
+  PASS ff84cb064d3  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS ff84cb064d3  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [44 rows / 44 images]
+  PASS ff84cb064d3  sources tab: image count and collections
+  PASS ff84cb064d3  mode band: frames built  [3]
+  PASS ff84cb064d3  mode scan: frames built  [29]
+  PASS ff84cb064d3  mode exp: frames built  [248]
+  PASS ff84cb064d3  mode custom: frames built  [1]
+  PASS ff84cb064d3  mode epoch: frames built  [3]
+  PASS ff84cb064d3  difference frames
+  PASS ff84cb064d3  shift-and-add with the target's motion
+  PASS ff84cb064d3  CSV: one row per SPHEREx image
+  PASS ff84cb064d3  candidate report written
+  PASS ff84cb064d3  Atlas loads with the 100 SPHEREx channel maps
+  PASS ff84cb064d3  compare with 2MASS
+  PASS ff84cb064d3  PDF export, every section  [11 pages]
+  PASS ff84cb064d3  no page errors
+== f9f2a773a19
+  PASS f9f2a773a19  field opens  [391 images]
+  PASS f9f2a773a19  visits: same grouping as Python  [3 visits]
+  PASS f9f2a773a19  spectrum: every clean measurement plotted, values exact  [286 points]
+  PASS f9f2a773a19  spectrum: flagged ones added when the switch is off  [389]
+  PASS f9f2a773a19  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS f9f2a773a19  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.093/0.093 px]
+  PASS f9f2a773a19  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS f9f2a773a19  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [119 rows / 119 images]
+  PASS f9f2a773a19  sources tab: image count and collections
+  PASS f9f2a773a19  mode band: frames built  [3]
+  PASS f9f2a773a19  mode scan: frames built  [102]
+  PASS f9f2a773a19  mode exp: frames built  [391]
+  PASS f9f2a773a19  mode custom: frames built  [1]
+  PASS f9f2a773a19  mode epoch: frames built  [3]
+  PASS f9f2a773a19  difference frames
+  PASS f9f2a773a19  shift-and-add with the target's motion
+  PASS f9f2a773a19  CSV: one row per SPHEREx image
+  PASS f9f2a773a19  candidate report written
+  PASS f9f2a773a19  Atlas loads with the 100 SPHEREx channel maps
+  PASS f9f2a773a19  compare with 2MASS
+  PASS f9f2a773a19  PDF export, every section  [15 pages]
+  PASS f9f2a773a19  no page errors
+== f6cdd3c5718
+  PASS f6cdd3c5718  field opens  [352 images]
+  PASS f6cdd3c5718  visits: same grouping as Python  [3 visits]
+  PASS f6cdd3c5718  spectrum: every clean measurement plotted, values exact  [261 points]
+  PASS f6cdd3c5718  spectrum: flagged ones added when the switch is off  [352]
+  PASS f6cdd3c5718  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS f6cdd3c5718  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.030/0.030 px]
+  PASS f6cdd3c5718  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS f6cdd3c5718  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [114 rows / 114 images]
+  PASS f6cdd3c5718  sources tab: image count and collections
+  PASS f6cdd3c5718  mode band: frames built  [3]
+  PASS f6cdd3c5718  mode scan: frames built  [102]
+  PASS f6cdd3c5718  mode exp: frames built  [352]
+  PASS f6cdd3c5718  mode custom: frames built  [1]
+  PASS f6cdd3c5718  mode epoch: frames built  [3]
+  PASS f6cdd3c5718  difference frames
+  PASS f6cdd3c5718  shift-and-add with the target's motion
+  PASS f6cdd3c5718  CSV: one row per SPHEREx image
+  PASS f6cdd3c5718  candidate report written
+  PASS f6cdd3c5718  Atlas loads with the 100 SPHEREx channel maps
+  PASS f6cdd3c5718  compare with 2MASS
+  PASS f6cdd3c5718  PDF export, every section  [14 pages]
+  PASS f6cdd3c5718  no page errors
+== faf9ada6f3f
+  PASS faf9ada6f3f  field opens  [363 images]
+  PASS faf9ada6f3f  visits: same grouping as Python  [3 visits]
+  PASS faf9ada6f3f  spectrum: every clean measurement plotted, values exact  [285 points]
+  PASS faf9ada6f3f  spectrum: flagged ones added when the switch is off  [356]
+  PASS faf9ada6f3f  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS faf9ada6f3f  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.030/0.030 px]
+  PASS faf9ada6f3f  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS faf9ada6f3f  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [109 rows / 109 images]
+  PASS faf9ada6f3f  sources tab: image count and collections
+  PASS faf9ada6f3f  mode band: frames built  [3]
+  PASS faf9ada6f3f  mode scan: frames built  [102]
+  PASS faf9ada6f3f  mode exp: frames built  [363]
+  PASS faf9ada6f3f  mode custom: frames built  [1]
+  PASS faf9ada6f3f  mode epoch: frames built  [3]
+  PASS faf9ada6f3f  difference frames
+  PASS faf9ada6f3f  shift-and-add with the target's motion
+  PASS faf9ada6f3f  CSV: one row per SPHEREx image
+  PASS faf9ada6f3f  candidate report written
+  PASS faf9ada6f3f  Atlas loads with the 100 SPHEREx channel maps
+  PASS faf9ada6f3f  compare with 2MASS
+  PASS faf9ada6f3f  PDF export, every section  [14 pages]
+  PASS faf9ada6f3f  no page errors
+== f39c01ddb22
+  PASS f39c01ddb22  field opens  [352 images]
+  PASS f39c01ddb22  visits: same grouping as Python  [3 visits]
+  PASS f39c01ddb22  spectrum: every clean measurement plotted, values exact  [249 points]
+  PASS f39c01ddb22  spectrum: flagged ones added when the switch is off  [351]
+  PASS f39c01ddb22  light curve: none possible, and the tab says why  [No source is clearly detected at the target position (in every channel its brightness is below 5 times its err]
+  PASS f39c01ddb22  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.036/0.036 px]
+  PASS f39c01ddb22  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS f39c01ddb22  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [51 rows / 51 images]
+  PASS f39c01ddb22  sources tab: image count and collections
+  PASS f39c01ddb22  mode band: frames built  [2]
+  PASS f39c01ddb22  mode scan: frames built  [29]
+  PASS f39c01ddb22  mode exp: frames built  [352]
+  PASS f39c01ddb22  mode custom: frames built  [1]
+  PASS f39c01ddb22  mode epoch: frames built  [3]
+  PASS f39c01ddb22  difference frames
+  PASS f39c01ddb22  shift-and-add with the target's motion
+  PASS f39c01ddb22  CSV: one row per SPHEREx image
+  PASS f39c01ddb22  candidate report written
+  PASS f39c01ddb22  Atlas loads with the 100 SPHEREx channel maps
+  PASS f39c01ddb22  compare with 2MASS
+  PASS f39c01ddb22  PDF export, every section  [14 pages]
+  PASS f39c01ddb22  no page errors
+== f3813e927d5
+  PASS f3813e927d5  field opens  [302 images]
+  PASS f3813e927d5  visits: same grouping as Python  [3 visits]
+  PASS f3813e927d5  spectrum: every clean measurement plotted, values exact  [62 points]
+  PASS f3813e927d5  spectrum: flagged ones added when the switch is off  [297]
+  PASS f3813e927d5  light curve: every usable point plotted, value = flux / channel median  [54 points, scatter 0.072]
+  PASS f3813e927d5  moving objects: browser = independent Python (same objects, same motions)  [0 reported, error floor 0.100/0.100 px]
+  PASS f3813e927d5  moving objects: every report passes the stated tests (>=5 sigma, >=3 visits, >=2/3 coverage)
+  PASS f3813e927d5  exposures table: one row per image in the frame (first 150, then a '…and N more' line)  [106 rows / 106 images]
+  PASS f3813e927d5  sources tab: image count and collections
+  PASS f3813e927d5  mode band: frames built  [3]
+  PASS f3813e927d5  mode scan: frames built  [99]
+  PASS f3813e927d5  mode exp: frames built  [302]
+  PASS f3813e927d5  mode custom: frames built  [1]
+  PASS f3813e927d5  mode epoch: frames built  [3]
+  PASS f3813e927d5  difference frames
+  PASS f3813e927d5  shift-and-add with the target's motion
+  PASS f3813e927d5  CSV: one row per SPHEREx image
+  PASS f3813e927d5  candidate report written
+  PASS f3813e927d5  Atlas loads with the 100 SPHEREx channel maps
+  PASS f3813e927d5  compare with 2MASS
+  PASS f3813e927d5  PDF export, every section  [13 pages]
+  PASS f3813e927d5  no page errors
+
+331/331 passed

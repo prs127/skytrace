@@ -69,6 +69,11 @@
 
   <!-- ============ CENTRE: the image and how to play it ============ -->
   <main class="st-pane st-stage" aria-label="Image viewer">
+    <div class="st-start" id="startHere" role="note"><b>New here?</b>
+      <span><i>1</i> Pick a target (left)</span><span><i>2</i> ▶ Play the visits</span>
+      <span title="Known stars get a blue circle; a dot without one is not in Gaia"><i>3</i> Turn on Gaia DR3</span><span><i>4</i> Moving objects tab (right)</span>
+      <a href="guide.html#first">Guide</a>
+      <button type="button" class="st-start-x" id="startHereClose" title="Hide these tips" aria-label="Hide these tips">✕</button></div>
     <div class="st-stage-head" data-help="viewer">
       <div class="st-stage-title">
         <button class="btn btn-sm btn-outline-secondary py-0 px-2 d-none" id="railShow" type="button" title="Show the library" aria-controls="rail">» Library</button>
@@ -98,6 +103,7 @@
       <input class="btn-check" type="checkbox" id="ovFlags"><label class="btn btn-sm st-chip" for="ovFlags" title="SPHEREx data-quality flags: red saturated, yellow artefact, grey masked">Flags</label>
       <input class="btn-check" type="checkbox" id="ovMovers"><label class="btn btn-sm st-chip" for="ovMovers" title="Pink tracks: moving objects found by the motion test (see the Moving objects tab)">Movers</label>
       <input class="btn-check" type="checkbox" id="ovCompass" checked><label class="btn btn-sm st-chip" for="ovCompass" title="North/East arrows and a 1′ scale bar">Compass</label>
+      <span id="layerNote" class="small text-secondary" role="status" aria-live="polite"></span>
     </div>
 
     <div class="st-imgrow">
@@ -214,6 +220,7 @@
         <div id="specPlot" class="st-plot"></div>
         <div class="d-flex gap-3 flex-wrap">
           <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specLog"><label class="form-check-label" for="specLog" title="Logarithmic flux axis: shows faint and bright points together">Log flux axis</label></div>
+          <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specBands"><label class="form-check-label" for="specBands" title="Dotted lines at the wavelengths of common water, methane, carbon dioxide and carbon monoxide bands: where to look, not a detection">Mark molecular bands</label></div>
           <div class="form-check form-switch small"><input class="form-check-input" type="checkbox" id="specClean" checked><label class="form-check-label" for="specClean" title="Leave out measurements with a flagged pixel in the aperture">Hide points with flagged pixels</label></div>
         </div>
         <div class="small text-secondary" id="specNote"></div>
@@ -221,6 +228,7 @@
       </div>
       <div class="tab-pane fade" id="tabLc" role="tabpanel" data-help="lightcurve">
         <div id="lcPlot" class="st-plot"></div>
+        <div class="small text-secondary" id="lcNote"></div>
         <details class="st-about"><summary>About this plot</summary>Brightness over time with the spectrum taken out: each clean measurement is divided by the median of the same target in the same SPHEREx channel. A steady star sits on 1; a variable star (R Draconis, RW Aurigae) moves away from 1.</details>
       </div>
       <div class="tab-pane fade" id="tabMovers" role="tabpanel" data-help="movers">

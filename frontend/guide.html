@@ -67,15 +67,15 @@
 <dl>
   <dt>Top bar</dt><dd>Page links (Home, Dashboard, How to use), the <b>search box</b> with its <b>field size</b> menu, a badge saying whether the live IRSA archive is connected, <b>Share</b> and <b>Export PDF</b>.</dd>
   <dt>Library (left)</dt><dd>The all-sky map, the example targets, your saved places in named folders, and your searches. « hides it; » Library brings it back.</dd>
-  <dt>Image (centre)</dt><dd>The field name (the <b>i</b> button next to it explains the field; a yellow <b>!</b> appears when a catalogued star is close enough to blend with the target), the <b>Layers</b> chips, the image with its play controls and visit buttons, and beside the image the frame details, the <b>What each frame shows</b> panel, the position read-out and <b>☆ Save this place</b>. The 102-channel strip is underneath.</dd>
+  <dt>Image (centre)</dt><dd>On your first visit a slim <b>New here?</b> line above the image lists the first four steps (pick a target, play, turn on Gaia DR3, open Moving objects); ✕ hides it for good. Then: the field name (the <b>i</b> button next to it explains the field; a yellow <b>!</b> appears when a catalogued star is close enough to blend with the target), the <b>Layers</b> chips, the image with its play controls and visit buttons, and beside the image the frame details, the <b>What each frame shows</b> panel, the position read-out and <b>☆ Save this place</b>. The 102-channel strip is underneath.</dd>
   <dt>Analysis (right)</dt><dd>Tabs for the spectrum, light curve, moving objects, exposures, atlas, visit settings, sharing and data sources. » hides it and the image grows into the space; the <b>« Analysis</b> button at the top right of the image brings it back.</dd>
 </dl>
 
 <h2 id="first">2. Your first five minutes</h2>
 <ol>
   <li>In the Library, open <b>Challenge targets</b> and click <b>WISE 0855-0714</b>.</li>
-  <li>Press <b>▶ Play</b>. Three frames, one per SPHEREx visit, play in a loop. The yellow crosshair marks where WISE 0855 should be on each date; watch the faint dot inside it shift slightly to the right (west): about 1.3 pixels between the first and last visit.</li>
-  <li>Click the <b>Gaia DR3</b> chip above the image. Every known star gets a blue circle. WISE 0855 has none: it is too cold and faint for Gaia.</li>
+  <li>Press <b>▶ Play</b>. Three frames, one per SPHEREx visit, play in a loop. The yellow crosshair marks where WISE 0855 should be on each date; watch the faint dot inside it shift slightly to the right (west): about 1.2 pixels between the first and last visit.</li>
+  <li>Click the <b>Gaia DR3</b> chip above the image. Stars from the Gaia DR3 catalogue (the brightest 400 in the field, down to G = 20) get a blue circle. WISE 0855 has none: it is too cold and faint for Gaia.</li>
   <li>Open the <b>Moving objects</b> tab on the right. The search reports one object, labelled as the target, moving about 7″ a year.</li>
   <li>Switch on <b>Difference</b> in the panel beside the image. Stars that did not move disappear; a moving object leaves a bright and a dark spot side by side.</li>
   <li>Open the <b>Spectrum</b> tab: each dot is WISE 0855's brightness in one SPHEREx image, from 0.75 to 5 µm.</li>
@@ -87,7 +87,7 @@
   <li><b>Names</b>: the challenge targets and their common short forms (e.g. <code>WISE 0855</code>, <code>Barnard</code>, <code>Epsilon Indi B</code>, <code>RW Aur</code>, <code>R Dra</code>, <code>M101</code>).</li>
   <li><b>Coordinates</b>: RA then Dec, in degrees (<code>133.795 -7.245</code>) or in hours and degrees (<code>08h55m10.8s -07d14m42s</code> or <code>08:55:10.8 -07:14:42</code>). Out-of-range or unreadable input is refused with a message under the box.</li>
   <li>If the position falls inside a field already on the server, Skytrace opens that field and pins the position instead of downloading again.</li>
-  <li>Otherwise the server searches NASA's IRSA archive for every SPHEREx image covering that spot, in all current data releases, and downloads only the needed pixels. A message shows its progress. A 9′ field with 300–400 images takes about 1–2 minutes.</li>
+  <li>Otherwise the server searches NASA's IRSA archive for the SPHEREx images covering that spot (up to 700 per search, spread evenly in time), in all current data releases, and downloads only the needed pixels. A message shows its progress. A 9′ field with 300–400 images usually takes a few minutes; how long depends on the field and on how quickly NASA IRSA answers.</li>
   <li><b>Field size</b> (9′, 15′, 20′) sets how much sky a new search downloads. A bigger field can follow faster-moving objects for longer, but it takes longer to download (about 1.6 times for 15′ and 2.2 times for 20′). Pre-built examples are 9.1′.</li>
 </ul>
 <div class="st-warn">On the copy of Skytrace without a live server (GitHub Pages), only the pre-built examples open; new searches send you to the live site.</div>
@@ -98,17 +98,17 @@
   <li><b>Challenge targets</b>: the five objects named in the challenge (WISE 0855-0714, Barnard's Star, Epsilon Indi B, RW Aurigae, R Draconis) and a control field, M101. They are pre-built and open in about a second.</li>
   <li><b>Fastest-moving stars</b>: the 25 stars with the largest proper motion in ESA's Gaia DR3 catalogue (over 3″ a year), with distance and brightness. Clicking one that is not built yet starts a live search that also uses its Gaia motion and parallax, so the crosshair follows it.</li>
   <li><b>Saved places</b>: your bookmarks, in folders you name (a folder called "My places" is there to start). Click <b>☆ Save this place</b> beside the image to save the whole field, or first click the image to pin a spot and save just that spot (📍). Choose a folder or make a new one, and add a note. In the Library, hover a saved place to <b>⇄</b> move it to another folder, <b>✎</b> rename it or <b>✕</b> remove it; hover a folder to <b>⤴</b> copy a link that shares the whole folder, rename it or delete it. Whoever opens a folder link gets a copy of the folder in their own Saved places. <b>+ New folder</b> makes an empty folder.</li>
-  <li><b>Your searches</b>: every place you search is added here. <b>✎</b> renames it and <b>✕</b> removes it from your list.</li>
+  <li><b>Your searches</b>: every new place you search or click on the sky map is added here (the challenge targets stay in their own folder). <b>✎</b> renames it and <b>✕</b> removes it from your list.</li>
 </ul>
 <p>Saved places, names and your searches are stored only in your browser: nothing is uploaded, and clearing the browser's site data removes them. Use folder links or PDF exports to keep or share them.</p>
 
 <h2 id="skymap">5. Where in the sky</h2>
-<p>The oval is the whole sky (RA across, Dec up). The ring marks the field on screen. The <b>dashed line</b> is the ecliptic, the path of the Sun and planets, where most asteroids and comets are. The light <b>band</b> is the plane of the Milky Way, where stars are crowded. Blue diamonds are the challenge targets; grey ones are other places searched on this server. <b>Click</b> anywhere to search that spot (a small rocket flies there while it loads).</p>
+<p>The oval is the whole sky (RA across, Dec up). The ring marks the field on screen. The <b>dashed line</b> is the ecliptic, the path of the Sun and planets, where most asteroids and comets are. The light <b>band</b> is the plane of the Milky Way, where stars are crowded. Blue diamonds are the challenge targets; grey ones are other places searched on this server. <b>Click</b> anywhere to search that spot (a small rocket flies there while it loads). A click is not aimed at any particular object, so Skytrace centres the new field on the <b>nearest star in Gaia DR3</b> (brighter than G = 18, within 90″ of the click) and measures that star; the field is named after it and its <b>i</b> note says where you clicked and how far away the star is. If no such star is that close, it measures the exact spot you clicked. Typed coordinates are always measured exactly where you typed them.</p>
 
 <h2 id="reading">6. Reading the image</h2>
 <ul>
   <li>North is up and east is left, as on a sky chart. One SPHEREx pixel is 6.15″; the full pre-built view is 9.1′ across.</li>
-  <li>The caption under the image names the frame (for example "Visit 2 (2/3)"), its dates, how many SPHEREx images were stacked, and their wavelength range.</li>
+  <li>The caption beside the image, above the <b>What each frame shows</b> panel, names the frame (for example "Visit 2 (2/3)"), its dates, how many SPHEREx images were stacked, and their wavelength range.</li>
   <li><b>Move the mouse</b> over the image to read RA and Dec (degrees and hours/degrees), the brightness in MJy/sr above the local sky, any SPHEREx flags at that pixel, and the nearest catalogued star.</li>
   <li><b>Click</b> to pin a position (red ×). The pin box lets you copy it in degrees or hours/degrees, put it into the search box, or clear it. The pin is saved in links and reports.</li>
 </ul>
@@ -162,7 +162,7 @@
 <p>The chips above the image switch markers on (✓) and off. Hover a chip for a reminder. The less obvious details are:</p>
 <dl>
   <dt>Target (yellow crosshair, on by default)</dt><dd>Where the target should be on that frame's date, computed from its catalogue position, proper motion and annual parallax (the small yearly wobble caused by Earth's orbit). If the object is where the crosshair says, the catalogue motion is right.</dd>
-  <dt>Gaia DR3 (blue circles)</dt><dd>Stars in ESA's Gaia DR3 catalogue, each moved to the frame's date with its own proper motion and parallax. A dot with no circle is not in Gaia: it may be too red or faint for Gaia, or new.</dd>
+  <dt>Gaia DR3 (blue circles)</dt><dd>Stars in ESA's Gaia DR3 catalogue, each moved to the frame's date with its own proper motion and parallax. The overlay holds the brightest 400 Gaia stars in the field (G &lt; 20), so a dot with no circle is not necessarily missing from Gaia: it may be fainter than that, too red for Gaia, or new. Check before claiming anything.</dd>
   <dt>CatWISE (orange squares)</dt><dd>Infrared sources from NASA's CatWISE2020 catalogue (WISE and NEOWISE), placed with their measured motion. Cold brown dwarfs that Gaia misses are often here.</dd>
   <dt>2MASS (white diamonds)</dt><dd>Sources from the 2MASS survey placed where they were in 1997–2001 and <i>not</i> moved. A fast-moving star has left its diamond behind: the gap shows its motion over 25 years.</dd>
   <dt>Flags</dt><dd>SPHEREx's own warnings for each pixel, shaded on the image: <span class="text-danger">red</span> saturated (too bright to measure), <span class="text-warning">yellow</span> artefact (ghost, halo, streak, crosstalk, persistence and similar), grey masked (no usable data). A pixel is shaded when at least half of the stacked images flag it. Do not trust anything that appears only inside a shaded area.</dd>
@@ -179,24 +179,28 @@
 <h2 id="spectrum">17. Spectrum</h2>
 <p>The target's brightness (µJy) at every wavelength SPHEREx measured, built on the fly from every image. Each dot is one image, coloured by visit; the ring marks images in the frame on screen.</p>
 <ul>
-  <li>Measured on the original detector pixels at the target's predicted position, with the same method as NASA IRSA's SPHEREx Source Discovery Tool tutorial: a 3-pixel-radius aperture minus the local sky, corrected for the light outside the aperture using SPHEREx's own point-spread function.</li>
+  <li>Measured on the original detector pixels at the target's predicted position, with the same method as NASA IRSA's SPHEREx Source Discovery Tool tutorial (one stricter step: every pixel that adds to the aperture sum is checked for flags, not only those whose centre is inside it, because a cosmic ray just outside the notebook's check once added 225 times the star's light): a 3-pixel-radius aperture minus the local sky, corrected for the light outside the aperture using SPHEREx's own point-spread function.</li>
+  <li><b>Outliers</b>: a value that SPHEREx did not flag but that is far from the same visit's other measurements at nearly the same wavelength (more than 5 times the local scatter and 3 times its own error; within 4 % in wavelength and 15 days) is marked <i>outlier</i> and treated like a flagged one. These are usually cosmic-ray hits the pipeline missed. In tests on 16 fields this marked 6 of about 3,000 values.</li>
   <li><b>Hide points with flagged pixels</b> (on by default): as in the tutorial, a measurement whose aperture contains any flagged pixel is left out. Switch it off to show them as hollow points.</li>
+  <li><b>Mark molecular bands</b>: dotted lines at the wavelengths of common water (1.4, 1.9, 2.7 µm; ice 3.05 µm), methane (2.3, 3.3 µm), carbon dioxide (4.27 µm) and carbon monoxide (2.3, 4.67 µm) bands, the molecules the challenge mentions. They show where to look; a line is not a detection.</li>
+  <li><b>Warnings above the numbers</b>: the tab says when catalogued stars are close enough for their light to fall in the 18.5″ measuring circle, and when SPHEREx's values differ by more than 2 times from the 2MASS or WISE catalogue brightness of the star at the target. Then the plot is the light inside the circle, not one star's spectrum.</li>
   <li><b>Log flux axis</b>: useful for very red objects such as brown dwarfs, whose brightness spans a large range.</li>
   <li>White diamonds are 2MASS J, H, Ks and orange squares are WISE W1, W2 (from CatWISE2020), converted to µJy and matched to the target at each catalogue's own date.</li>
   <li>For stars that saturate SPHEREx (Barnard's Star, R Draconis) the measurements are withheld, as the tutorial's rule requires.</li>
 </ul>
 
 <h2 id="lightcurve">18. Light curve</h2>
-<p>Brightness against date with the colour taken out: each clean measurement is divided by the median of the target's measurements in the same channel. A steady star stays on the dotted line at 1; a variable star such as RW Aurigae or R Draconis moves above and below it. It needs at least two clean measurements in a channel.</p>
+<p>Brightness against date with the colour taken out: each clean measurement is divided by the median of the target's measurements in the same channel. A steady star stays on the dotted line at 1; a variable star moves above and below it. It needs at least two clean measurements in a channel, and the target must be clearly detected there (median brightness at least 5 times its error): at an empty position the measurements are sky noise, and dividing noise by its own median would draw large changes that mean nothing, so the tab says no source is detected instead. Stars too bright for SPHEREx get no light curve: Barnard's Star and R Draconis saturate in every image and RW Aurigae in most (only 8 usable points), and a saturated value is not a measurement of brightness, so plotting it would show changes that are not real. The tab says when this is the case. Their images still blink normally.</p>
 
 <h2 id="movers">19. Moving objects</h2>
 <p>An automatic search for objects that move between visits, with strict tests so that noise is not reported as motion.</p>
 <ol>
   <li>Each visit is stacked, and sources are found in each stack separately.</li>
   <li>How precisely positions can be measured is worked out on the field itself, from Gaia DR3 stars that cannot move measurably. The visits are also lined up on those stars.</li>
+  <li>The search uses the detectors chosen in the menu beside the image, so it changes when you change them. WISE 0855 opens in D5+D6, where it is bright; with all six detectors averaged it is too faint to pass the tests.</li>
   <li>Sources are linked across visits along straight lines. An object is reported only if it is seen in <b>at least three visits</b> (two points always fit a line), the straight line fits, the motion is at least <b>5σ</b> and at least half a pixel in total, it is seen in at least two thirds of the visits that cover its path, its brightness changes by less than three times, and no other source sits within 2 pixels.</li>
 </ol>
-<p>Each result gives the motion in arcseconds per year with its uncertainty, the significance, and how many visits it was seen in. It is labelled <b>the target</b>, <b>known star Gaia DR3 …</b> (with the catalogue motion to compare), or <b>not in Gaia DR3: check it by eye</b>. Click a result to pin it; switch on the <b>Movers</b> layer to see its track. Under the list, a line says how many sources were tested and why the others were not reported.</p>
+<p>Each result gives the motion in arcseconds per year with its uncertainty, the significance, and how many visits it was seen in. It is labelled <b>the target</b>, <b>known star Gaia DR3 …</b> (with the catalogue motion to compare), or <b>no match in the Gaia DR3 overlay: check it by eye</b> (the overlay holds the brightest 400 Gaia stars in the field, so no match does not prove an object is unknown). Click a result to pin it; switch on the <b>Movers</b> layer to see its track. Under the list, a line says how many sources were tested and why the others were not reported.</p>
 <div class="st-tip">To check a new candidate: blink it with <b>Difference</b> on, look for it in <b>Compare with</b> AllWISE and 2MASS, and use <b>Shift-and-add</b> with its motion. A real mover becomes a sharp dot.</div>
 <div class="st-warn">Saturated stars and their surroundings are skipped. Fast solar-system objects that cross the whole field within one visit are not searched. With only two visits, motion cannot be tested.</div>
 
@@ -254,6 +258,7 @@
 
 <h2 id="limits">28. Limits</h2>
 <ul>
+  <li>The moving-object search needs a total shift of at least half a pixel (3″) across the visits: about 3″ a year for visits one year apart, plus its other tests.</li>
   <li>Motions are small compared with SPHEREx's 6.15″ pixels: Barnard's Star moves about 1.7 pixels a year, WISE 0855 about 1.3. They are seen best between visits a year apart.</li>
   <li>Barnard's Star and R Draconis saturate SPHEREx, so their brightness and automatic motion measurements are withheld; their images and motion are still shown.</li>
   <li>A stacked frame averages many channels: good for positions, not for spectra (use the Spectrum tab).</li>

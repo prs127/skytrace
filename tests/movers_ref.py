@@ -118,7 +118,7 @@ def detect(stack, fl):
 
 def run(data, key, det='all', verbose=True):
     m, img, cat = load(data, key)
-    ex = m['exposures']; noises = sorted(e['noise'] for e in ex if (e['noise'] or 0) > 0); medn = noises[len(noises) // 2]
+    ex = m['exposures']; noises = sorted(e['noise'] for e in ex if (e['noise'] or 0) > 0); medn = noises[len(noises) // 2] if noises else 1.0   # as the page
     V = [[i for i in v if det_ok(m, i, det)] for v in visits(m)]; V = [v for v in V if v]
     t = np.array([np.mean([ex[i]['mjd'] for i in v]) for v in V])
     stacks = []

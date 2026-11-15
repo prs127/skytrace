@@ -31,7 +31,7 @@
   };
   const MODE_HELP = {
     epoch: 'One stacked frame per visit (exposures grouped in time). Best for seeing motion between visits. A stack averages many channels, so its brightness is a band average, good for positions, not for spectra.',
-    band: 'Compares visits at the same wavelength channel, so colour changes cannot fake motion. The channel is exact at the target; SPHEREx filters vary across the detector, so at the corners of the full 9.1′ view the wavelength differs by up to half a channel (0.4–1.3%). Click a channel in the strip below.',
+    band: 'Compares visits at the same wavelength channel, so colour changes are much less likely to look like motion. The channel is exact at the target; SPHEREx filters vary across the detector, so at the corners of the full 9.1′ view the wavelength differs by up to half a channel (0.4–1.3%). Click a channel in the strip below.',
     scan: 'Plays one visit through the official SPHEREx channels, one by one: a spectrum movie showing at which wavelengths each source is bright. Channel wavelengths are exact at the target and drift by up to half a channel at the field corners.',
     exp: 'Every exposure in time order. Wavelength changes frame to frame, so stars flicker; fast asteroids and comets still stand out.',
     custom: 'Build your own comparison: average of visits in A minus average of visits in B.',
@@ -47,7 +47,7 @@
   let LIMITS = null;            // display limits cache
   let RENDER_CACHE = new Map();
   let PIN = null;               // {ra, dec, label}
-  let MOVERS = [], MOVER_INFO = null, SPEC_NOTE = '';
+  let MOVERS = [], MOVER_INFO = null, SPEC_NOTE = '', SNAP_NEXT = false;
   let playTimer = null;
   let suppressUrl = false;
   const LIVE_URL = (window.SKYTRACE_LIVE_URL || '').trim();
@@ -265,7 +265,8 @@
   // Everything is stored in this browser; a folder is shared as a link that carries the list itself (no server).
   function savedLoad() {
     try { const d = JSON.parse(localStorage.getItem('skytrace-saved') || 'null'); if (d && Array.isArray(d.folders)) return d; } catch (e) { /* storage off */ }
-    return { folders: [{ id: 'f' + Date.now().toString(36), name: 'My places', items: [] }] };
+    // fixed id for the starter folder: it must be the same folder every time it is read, before anything is saved
+    return { folders: [{ id: 'fmyplaces', name: 'My places', items: [] }] };
   }
   function savedStore(d) { try { localStorage.setItem('skytrace-saved', JSON.stringify(d)); } catch (e) { /* storage off */ } }
   const uid = () => Math.random().toString(36).slice(2, 9);
@@ -380,6 +381,7 @@
       if (imgBytes.length !== len * 2 || catBytes.length !== len) throw new Error(`Corrupt field data (${imgBytes.length} / ${len * 2} bytes)`);
       const u16 = new Uint16Array(imgBytes.buffer, imgBytes.byteOffset, len);
       const img = new Float32Array(len); for (let i = 0; i < len; i++) img[i] = F16[u16[i]];
+      markOutliers(meta.exposures);
       F = { meta, img, cat: catBytes, np, n };
       const noises = meta.exposures.map((e) => e.noise).filter((v) => v > 0).sort((a, b) => a - b);
       F.medNoise = noises.length ? noises[Math.floor(noises.length / 2)] : 1;
@@ -766,18 +768,21 @@
     ctx.clearRect(0, 0, g.W, g.W);
     ctx.lineWidth = Math.max(1, g.dpr);
     // flags
+    let nflag = -1;
     if (ovOn('flags') && fr.cat) {
-      const id = new ImageData(g.npc, g.npc), d = id.data;
+      const id = new ImageData(g.npc, g.npc), d = id.data; nflag = 0;
       for (let r = 0; r < g.npc; r++) { const y = g.off + (g.npc - 1 - r); for (let x = 0; x < g.npc; x++) {
         const cv = fr.cat[y * F.np + g.off + x], o = (r * g.npc + x) * 4;
         if (cv & CAT_SAT) { d[o] = 255; d[o + 1] = 40; d[o + 2] = 40; d[o + 3] = 120; }
         else if (cv & CAT_ART) { d[o] = 255; d[o + 1] = 200; d[o + 2] = 0; d[o + 3] = 90; }
         else if (cv & CAT_BAD) { d[o] = 120; d[o + 1] = 120; d[o + 2] = 140; d[o + 3] = 110; }
+        if (cv & (CAT_SAT | CAT_ART | CAT_BAD)) nflag++;
       } }
       const tmp = document.createElement('canvas'); tmp.width = tmp.height = g.npc; tmp.getContext('2d').putImageData(id, 0, 0);
       ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, 0, 0, g.W, g.W);
     }
-    const t = F.meta.target;
+    // say so when the Flags layer is on but nothing in view is flagged, so an empty layer is not mistaken for a fault
+    if ($('layerNote')) $('layerNote').textContent = nflag === 0 ? 'Flags: no flagged pixels in this view' : '';
     // catalogs
     if (ovOn('gaia')) {
       for (const st of F.meta.catalogs.gaia) {
@@ -947,10 +952,28 @@
   }
 
   // ---------------------------------------------------------------- spectrum & light curve (Plotly)
-  const PLOT_LAYOUT = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#cbd5e1', size: 11 }, margin: { l: 52, r: 10, t: 8, b: 38 }, legend: { orientation: 'h', y: 1.12, font: { size: 10 } } };
+  const PLOT_LAYOUT = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#cbd5e1', size: 11 }, margin: { l: 52, r: 10, t: 8, b: 38 }, legend: { orientation: 'h', x: 0, xanchor: 'left', y: 1.01, yanchor: 'bottom', font: { size: 10 } } };   // legend above the plotting area (the margin grows to fit it), never on the points
+  const MOL_BANDS = [[1.4, 'H₂O'], [1.9, 'H₂O'], [2.3, 'CH₄/CO'], [2.7, 'H₂O'], [3.05, 'H₂O ice'], [3.3, 'CH₄'], [4.27, 'CO₂'], [4.67, 'CO']];
   const VISIT_COLORS = ['#4dabf7', '#ffd43b', '#ff6b6b', '#69db7c', '#da77f2', '#ffa94d', '#20c997', '#f783ac'];
-  function exposureVisit(i) { return VISITS.findIndex((v) => v.idx.includes(i)); }
-  function isFlagged(e) { return e.phot_flags && e.phot_flags.length > 0; }
+  function isFlagged(e) { return (e.phot_flags && e.phot_flags.length > 0) || !!e._outlier; }
+  function flagsOf(e) { return (e.phot_flags || []).concat(e._outlier ? ['outlier'] : []); }
+  // A measurement that SPHEREx did not flag but that disagrees strongly with the same visit's measurements at nearly the
+  // same wavelength (within 4 %, within 15 days) is marked 'outlier' and treated like a flagged one (hidden by default,
+  // hollow when shown). Rule: more than 5 x the local scatter (or the typical error, if larger) and more than 3 x its
+  // own error, with at least 4 neighbours. In tests on 16 fields this caught 6 of about 3,000 clean values, all in the
+  // long-wavelength detectors (likely unflagged cosmic rays). tests/tools_check.py applies the same rule in Python.
+  function markOutliers(ex) {
+    const ok = ex.filter((e) => e.flux_ujy !== null && e.wave && !(e.phot_flags && e.phot_flags.length));
+    for (const e of ex) e._outlier = false;
+    for (const e of ok) {
+      const win = ok.filter((x) => Math.abs(x.mjd - e.mjd) < 15 && Math.abs(x.wave - e.wave) <= 0.04 * e.wave);
+      const nb = win.filter((x) => x !== e).map((x) => x.flux_ujy).sort((p, q) => p - q);
+      if (nb.length < 4) continue;
+      const med = percentile(nb, 50), mad = 1.4826 * percentile(nb.map((v) => Math.abs(v - med)).sort((p, q) => p - q), 50);
+      const sig = Math.max(mad, percentile(win.map((x) => x.flux_err || 0).sort((p, q) => p - q), 50));
+      if (Math.abs(e.flux_ujy - med) > 5 * sig && Math.abs(e.flux_ujy - med) > 3 * (e.flux_err || 0)) e._outlier = true;
+    }
+  }
   function drawSpectrum() {
     if (!window.Plotly || !F) { $('specPlot').innerHTML = '<div class="small text-secondary p-2">Plot library unavailable.</div>'; return; }
     const ex = F.meta.exposures, traces = [];
@@ -959,7 +982,7 @@
       traces.push({ x: pts.map((i) => ex[i].wave), y: pts.map((i) => ex[i].flux_ujy), error_y: { type: 'data', array: pts.map((i) => ex[i].flux_err || 0), thickness: 0.8, width: 0, color: VISIT_COLORS[k % 8] },
         mode: 'markers', type: 'scatter', name: `V${k + 1} ${mjdToDate(v.mjd0).slice(0, 7)}`,
         marker: { size: 5, color: VISIT_COLORS[k % 8], symbol: pts.map((i) => isFlagged(ex[i]) ? 'circle-open' : 'circle') },
-        text: pts.map((i) => `${ex[i].obs_id} D${ex[i].det}<br>${mjdToIso(ex[i].mjd)}${isFlagged(ex[i]) ? '<br>flags: ' + ex[i].phot_flags.join(', ') : ''}`), hovertemplate: '%{x:.3f} µm<br>%{y:.1f} µJy<br>%{text}<extra></extra>' });
+        text: pts.map((i) => `${ex[i].obs_id} D${ex[i].det}<br>${mjdToIso(ex[i].mjd)}${isFlagged(ex[i]) ? '<br>flags: ' + flagsOf(ex[i]).join(', ') : ''}`), hovertemplate: '%{x:.3f} µm<br>%{y:.1f} µJy<br>%{text}<extra></extra>' });
     });
     const yr = (mjd) => (2000 + (mjd - 51544.5) / 365.25).toFixed(0);
     for (const [survey, sym, col, label] of [['2MASS', 'diamond', '#ffffff', '2MASS J/H/Ks'], ['WISE', 'square', '#ff9f43', 'WISE W1/W2 (CatWISE2020)']]) {
@@ -972,14 +995,23 @@
     }
     traces.push({ x: [], y: [], mode: 'markers', type: 'scatter', name: 'this frame', marker: { size: 11, color: 'rgba(0,0,0,0)', line: { color: '#fff', width: 1.5 } }, hoverinfo: 'skip' });
     const layout = { ...PLOT_LAYOUT, xaxis: { title: 'wavelength (µm)', range: [0.7, 5.1], gridcolor: '#1f2937' }, yaxis: { title: 'flux (µJy)', type: S.specLog ? 'log' : 'linear', gridcolor: '#1f2937' } };
+    if ($('specBands') && $('specBands').checked) {
+      // reference wavelengths of common molecular absorption bands (where to look; a mark is not a detection)
+      layout.shapes = MOL_BANDS.map((b) => ({ type: 'line', xref: 'x', yref: 'paper', x0: b[0], x1: b[0], y0: 0, y1: 1, line: { color: 'rgba(148,163,184,.55)', width: 1, dash: 'dot' } }));
+      layout.annotations = MOL_BANDS.map((b, i) => ({ x: b[0], xref: 'x', y: i % 2 ? 0.93 : 0.99, yref: 'paper', text: b[1], showarrow: false, font: { size: 9, color: '#94a3b8' }, xanchor: 'left', xshift: 2 }));
+    }
     Plotly.react('specPlot', traces, layout, { displaylogo: false, responsive: true, modeBarButtonsToRemove: ['lasso2d', 'select2d'] });
     if (FRAMES.length) highlightSpectrum(FRAMES[S.frame]);
     const n = ex.filter((e) => e.flux_ujy !== null).length, nf = ex.filter((e) => e.flux_ujy !== null && isFlagged(e)).length, nw = ex.filter((e) => e.flux_ujy === null).length;
-    const main = `${n - nf} clean measurements` + (nf ? `, ${nf} with flagged pixels in the aperture${S.specClean ? ' (hidden)' : ' (hollow)'}` : '') + (nw ? `, ${nw} not measurable (off the detector or no background)` : '') + '.'
-      + (n && nf === n ? ' Every measurement has flagged pixels: this target is bright enough to saturate SPHEREx, so its photometry is not reliable.' : '');
+    const contam = contaminationNote(ex);
+    const no = ex.filter((e) => e._outlier).length;
+    const main = `${n - nf} clean measurements` + (nf ? `, ${nf - no} with flagged pixels in the aperture` + (no ? ` and ${no} outlier${no > 1 ? 's' : ''} (far from the same visit at nearby wavelengths)` : '') + (S.specClean ? ' (hidden)' : ' (hollow)') : '') + (nw ? `, ${nw} not measurable (off the detector or no background)` : '') + '.'
+      + (n && nf === n ? ' Every measurement has flagged pixels: this target is bright enough to saturate SPHEREx, so its photometry is not reliable.' : '')
+      + (() => { const s = ex.filter((e) => e.flux_ujy !== null && !isFlagged(e) && e.flux_err > 0).map((e) => e.flux_ujy / e.flux_err).sort((p, q) => p - q);
+        return s.length && percentile(s, 50) < 3 ? ' No source is clearly detected at the target position: these values are mostly sky noise around zero.' : ''; })();
     const notes = (F.meta.sed || []).filter((p) => p.note).map((p) => p.note).join(' ');
-    SPEC_NOTE = main + (notes ? ' ' + notes : '');
-    $('specNote').innerHTML = escapeHtml(main) + (notes ? `<details class="st-about mt-1"><summary>Notes on the 2MASS / WISE points</summary>${escapeHtml(notes)}</details>` : '');
+    SPEC_NOTE = (contam ? contam + ' ' : '') + main + (notes ? ' ' + notes : '');
+    $('specNote').innerHTML = (contam ? `<div class="text-warning mb-1">⚠ ${escapeHtml(contam)}</div>` : '') + escapeHtml(main) + (notes ? `<details class="st-about mt-1"><summary>Notes on the 2MASS / WISE points</summary>${escapeHtml(notes)}</details>` : '');
   }
   function highlightSpectrum(fr) {
     if (!window.Plotly || !F || !$('specPlot').data) return;
@@ -987,6 +1019,7 @@
     const idx = $('specPlot').data.length - 1;
     try { Plotly.restyle('specPlot', { x: [m.map((i) => ex[i].wave)], y: [m.map((i) => ex[i].flux_ujy)] }, [idx]); } catch (e) { /* plot hidden */ }
   }
+  const LC_SNR = 5;
   function drawLightCurve() {
     // Variability free of spectral shape: SPHEREx sees the target at a different wavelength in every exposure, so each
     // clean measurement is divided by the median of all clean measurements of the same star in the same channel.
@@ -994,8 +1027,14 @@
     if (!window.Plotly || !F) return;
     const ex = F.meta.exposures, byBand = {};
     ex.forEach((e, i) => { if (e.flux_ujy !== null && e.band && !isFlagged(e) && e.flux_ujy > 0) (byBand[e.band] = byBand[e.band] || []).push(i); });
-    const med = {};
-    for (const [b, idx] of Object.entries(byBand)) if (idx.length >= 2) { const v = idx.map((i) => ex[i].flux_ujy).sort((p, q) => p - q); med[b] = percentile(v, 50); }
+    // a channel is used only if the target is clearly detected in it (median flux >= LC_SNR x median error): at an empty
+    // position the "flux" is sky noise, and dividing noise by its own median would draw large, meaningless changes
+    const med = {}; let nFaint = 0;
+    for (const [b, idx] of Object.entries(byBand)) if (idx.length >= 2) {
+      const v = idx.map((i) => ex[i].flux_ujy).sort((p, q) => p - q), e = idx.map((i) => ex[i].flux_err || 0).sort((p, q) => p - q);
+      const mv = percentile(v, 50), me = percentile(e, 50);
+      if (mv >= LC_SNR * me) med[b] = mv; else nFaint++;
+    }
     const traces = [];
     for (let d = 1; d <= 6; d++) {
       const pts = ex.map((e, i) => i).filter((i) => ex[i].det === d && med[ex[i].band] && ex[i].flux_ujy !== null && !isFlagged(ex[i]) && ex[i].flux_ujy > 0);
@@ -1005,7 +1044,21 @@
         mode: 'markers', type: 'scatter', name: `D${d}`, marker: { size: 5, color: waveColor(DET_RANGE[d] ? (DET_RANGE[d][0] + DET_RANGE[d][1]) / 2 : 1) },
         text: pts.map((i) => `channel ${ex[i].band}, ${fmt(ex[i].wave, 3)} µm, ${fmt(ex[i].flux_ujy, 4)} µJy`), hovertemplate: '%{x}<br>%{y:.3f} × channel median<br>%{text}<extra>D' + d + '</extra>' });
     }
-    if (!traces.length) { try { Plotly.purge('lcPlot'); } catch (e) { /* none */ } $('lcPlot').innerHTML = '<div class="small text-secondary p-3">No channel has two or more clean measurements of the target (flagged pixels in the aperture, or the target saturates SPHEREx).</div>'; return; }
+    const nMeas = ex.filter((e) => e.flux_ujy !== null).length, nClean = Object.values(byBand).reduce((s, v) => s + v.length, 0);
+    const nSat = ex.filter((e) => e.flux_ujy !== null && (e.phot_flags || []).includes('saturated')).length;
+    const nUsed = traces.reduce((s, t) => s + t.x.length, 0);
+    $('lcNote').textContent = traces.length
+      ? `${nUsed} of ${nMeas} measurements used: no flagged pixel in the aperture, in channels measured clean at least twice where the target is detected at ${LC_SNR}σ or more.` + (nSat > nMeas / 2 ? ` ${nSat} measurements are saturated and left out.` : '')
+      : '';
+    if (!traces.length) {
+      try { Plotly.purge('lcPlot'); } catch (e) { /* none */ }
+      // not a fault: say exactly why there is nothing to plot (a saturated star's flux is not a measurement of its brightness)
+      const why = nMeas === 0 ? 'The target could not be measured in any image (off the detector or no clean background).'
+        : nSat > nMeas / 2 ? `${displayName(F.meta.key, F.meta.name)} is too bright for SPHEREx: ${nSat} of its ${nMeas} measurements are saturated (the brightest pixels exceed what the detector can record), so its brightness cannot be measured and no light curve is drawn. Plotting those values would show changes that are not real. Its images still blink normally.`
+        : nFaint ? `No source is clearly detected at the target position (in every channel its brightness is below ${LC_SNR} times its error), so a light curve would only show noise. The Spectrum tab still lists every measurement with its error bar.`
+        : `Only ${nClean} of ${nMeas} measurements are clean (no flagged pixel in the aperture), and no channel has two of them, so brightness cannot be compared over time.`;
+      $('lcPlot').innerHTML = `<div class="small text-secondary p-3">${escapeHtml(why)}</div>`; return;
+    }
     if (!$('lcPlot').data) $('lcPlot').innerHTML = '';
     Plotly.react('lcPlot', traces, { ...PLOT_LAYOUT, xaxis: { type: 'date', gridcolor: '#1f2937' }, yaxis: { title: 'flux ÷ median in same channel', gridcolor: '#1f2937', zeroline: false },
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: '#64748b', width: 1, dash: 'dot' } }] }, { displaylogo: false, responsive: true });
@@ -1074,12 +1127,12 @@
     // "not in Gaia": refuse rather than risk false movers. (Happens only if IRSA's catalogue service failed at build time.)
     if ((F.meta.catalog_warnings || []).some((w) => /Gaia/.test(w))) {
       box.innerHTML = '<div class="text-warning">Not run: the Gaia DR3 star catalogue could not be fetched from NASA IRSA when this field was built, and the check needs Gaia stars to line the visits up and to tell known stars from new ones. </div>'
-        + (LIVE ? '<button class="btn btn-sm btn-outline-info mt-2" id="moverRebuild">Rebuild this field now</button>' : '');
-      const rb = $('moverRebuild'); const T = F.meta.target;
-      if (rb) rb.onclick = () => liveBuild({ ra: T.ra, dec: T.dec, pmra: T.pmra, pmdec: T.pmdec, plx: T.plx, epoch_mjd: T.epoch_mjd, size: [9, 15, 20].find((z) => Math.abs(z * 60 / PIX - F.np) < 15) || 9, force: 1 });
+        + (LIVE ? '<button class="btn btn-sm btn-outline-info mt-2" id="moverRebuild">Fetch the catalogues again</button>' : '');
+      const rb = $('moverRebuild');
+      if (rb) rb.onclick = refreshCatalogs;
       if (ovOn('movers')) drawOverlay(); return;
     }
-    const n = F.np, t = vis.map(meanMjd), E = vis.map(meanEarth), ex = F.meta.exposures;
+    const n = F.np, t = vis.map(meanMjd), E = vis.map(meanEarth);
     const stacks = vis.map((m) => { const c = balancedCoadd(m); flattenPlane(c.img); return c; });
     const D = stacks.map((c) => detectSources(c.img, c.cat, n));
     const base = (t[t.length - 1] - t[0]) / 365.25;
@@ -1192,11 +1245,12 @@
     const box = $('moverList'), I = MOVER_INFO; if (!I) return;
     const label = (m) => m.target ? `<span class="text-info">the target, ${escapeHtml(m.target.name)}</span> (catalogue ${m.target.pm.toFixed(2)}″/yr)`
       : m.gaia ? `<span class="text-info">known star Gaia DR3 ${m.gaia.id}</span> (catalogue ${m.gaia.pm.toFixed(2)}″/yr)`
-      : '<span class="text-warning">not in Gaia DR3: check it by eye before believing it</span>';
+      : '<span class="text-warning">no match in the Gaia DR3 overlay (brightest 400 stars): check it by eye before believing it</span>';
     const rows = MOVERS.map((m, i) => `<div class="mover-row p-1 border-bottom border-secondary-subtle" data-i="${i}" role="button" tabindex="0"><b>M${i + 1}</b> moves ${m.pm.toFixed(1)} ± ${m.epm.toFixed(1)}″/yr · ${m.sig.toFixed(1)}σ · seen in ${m.n} of ${m.covered} visits<br>${label(m)}</div>`).join('');
     const w = I.why;
     box.innerHTML = (I.targetSat ? '<div class="text-warning mb-1">The target is so bright that SPHEREx saturates on it, so it cannot be measured here. Its motion is still visible when you blink the visits or use shift-and-add.</div>' : '')
       + (MOVERS.length ? rows : `<div>No moving object passed every test in ${I.visits} visits.</div>`)
+      + `<div class="small text-secondary mt-1">Searched in: ${escapeHtml(($('detSel').selectedOptions[0] || {}).textContent || 'all detectors')} (the detector menu beside the image). Cold brown dwarfs show best in D5+D6.</div>`
       + `<details class="st-about mt-2"><summary>How these were checked</summary>Checked ${I.tracks} sources seen in at least three visits over ${I.base.toFixed(2)} yr. Not reported: ${w.still} not moving, ${w.slow} motion too small to be sure (under 5σ or under 0.5 px), ${w.fewVisits} missing from too many visits, ${w.flux} changing brightness more than ×3, ${w.blend} blended with a neighbour. `
       + `Position error per visit: ${I.a.toFixed(2)} px floor, measured on ${I.ncal} Gaia star positions in this field. Saturated stars and their surroundings are skipped.</details>`;
     box.querySelectorAll('.mover-row').forEach((r) => { const go = () => { const m = MOVERS[+r.dataset.i]; setPin(m.ra, m.dec); }; r.onclick = go; r.onkeydown = (e) => { if (e.key === 'Enter') go(); }; });
@@ -1219,7 +1273,8 @@
     const m = F.meta, ex = m.exposures, t = m.target;
     const mj = ex.map((e) => e.mjd); const sat = ex.filter((e) => (e.target_flags || []).some((f) => f === 'OVERFLOW' || f === 'NONLINEAR')).length;
     $('provenance').innerHTML = `
-      ${(m.catalog_warnings || []).map((w) => `<div class="text-warning">${escapeHtml(w)} when this field was built; that layer is empty. Rebuilding later fixes it.</div>`).join('')}
+      ${(m.catalog_warnings || []).map((w) => `<div class="text-warning">${escapeHtml(w)} when this field was built; that layer is empty.</div>`).join('')}
+      ${(m.catalog_warnings || []).length && LIVE ? '<button class="btn btn-sm btn-outline-info mb-2" id="catRetry">Fetch the catalogues again (seconds; the images are kept)</button>' : ''}
       <div><b>${ex.length}</b> SPHEREx exposures, <b>${VISITS.length}</b> visits, ${mjdToDate(Math.min(...mj))} → ${mjdToDate(Math.max(...mj))}</div>
       <div>Grid ${m.grid.npix}×${m.grid.npix} px at ${m.grid.pixscale}″ (${(m.grid.npix * m.grid.pixscale / 60).toFixed(1)}′), centre ${m.grid.crval[0].toFixed(5)} ${m.grid.crval[1].toFixed(5)}</div>
       <div>Target PM ${fmt(t.pmra / 1000, 3)}, ${fmt(t.pmdec / 1000, 3)} ″/yr · ${m.source || ''}</div>
@@ -1229,13 +1284,46 @@
       <div class="text-secondary">Built ${m.built} in ${m.build_seconds}s · <a href="https://irsa.ipac.caltech.edu/Missions/spherex.html" target="_blank" rel="noopener">IRSA SPHEREx</a></div>
       ${LIVE ? '<button class="btn btn-sm btn-outline-success mt-2" id="checkReleases">Check IRSA for new data releases</button><div id="relMsg" class="form-text small"></div>' : ''}`;
     if (LIVE) $('checkReleases').onclick = checkReleases;
+    if ($('catRetry')) $('catRetry').onclick = refreshCatalogs;
+  }
+  // IRSA's catalogue service sometimes fails while the images download fine: fetch only the catalogues again
+  async function refreshCatalogs() {
+    if (!F || !LIVE) return;
+    const key = F.meta.key; veil(true, 'Fetching the star catalogues again from NASA IRSA…');
+    try {
+      let st = await fetchJson('api/catalogs?key=' + encodeURIComponent(key), { method: 'POST' });
+      while (st.status === 'running') { await new Promise((r) => setTimeout(r, 1500)); st = await fetchJson('api/job/' + st.id); veil(true, st.message || 'Working…'); }
+      if (st.status === 'error') throw new Error(st.message);
+      await openField(key, false);
+      setMsg($('coordMsg'), st.message, (F.meta.catalog_warnings || []).length ? 'warning' : 'success');
+    } catch (e) { veil(true, 'Could not fetch the catalogues: ' + e.message); setTimeout(() => veil(false), 6000); }
   }
 
-  function renderBlendNote() {
-    // Warn when a catalogued star sits within ~2.5 SPHEREx pixels of the target during the SPHEREx era
+  // Two independent checks that the spectrum is the light of ONE object: (1) catalogued stars close enough for their light
+  // to fall in the 3-pixel (18.5") measuring circle; (2) SPHEREx's own values against the 2MASS / WISE catalogue fluxes of
+  // the star matched at the target (independent missions): a large mismatch means the circle holds other light too.
+  const BANDS = { '2MASS J': [1.11, 1.36], '2MASS H': [1.50, 1.80], '2MASS Ks': [2.00, 2.32], 'WISE W1': [3.05, 3.80], 'WISE W2': [4.20, 5.0] };
+  function contaminationNote(ex) {
+    const msgs = [], near = blendNeighbours();
+    if (near.length) msgs.push(`Other catalogued stars lie close enough for their light to fall in the measuring circle (${near.map((o) => `G=${o.s.g} at ${o.d.toFixed(1)}″`).join(', ')}), so this spectrum may include their light.`);
+    const clean = ex.filter((e) => e.flux_ujy !== null && e.wave && !isFlagged(e));
+    const r = (F.meta.sed || []).filter((p) => p.flux_ujy > 0 && BANDS[p.band]).map((p) => {
+      const v = clean.filter((e) => e.wave >= BANDS[p.band][0] && e.wave <= BANDS[p.band][1]).map((e) => e.flux_ujy).sort((x, y) => x - y);
+      return v.length >= 3 ? { band: p.band, ratio: percentile(v, 50) / p.flux_ujy } : null; }).filter(Boolean);
+    const bad = r.filter((x) => x.ratio > 2 || x.ratio < 0.5);
+    if (bad.length) msgs.push(`SPHEREx measures ${bad.map((x) => `${x.ratio.toFixed(1)}× the ${x.band} catalogue brightness`).join(', ')} of the star matched at this position. The measuring circle probably holds light from other sources or from an extended object such as a galaxy (or the star has changed), so read this as the light inside the circle, not as one star's spectrum.`);
+    return msgs.join(' ');
+  }
+  function blendNeighbours() {
+    // stars within 3 px (inside the circle) of any brightness, or within 5 px if brighter than G = 15 (their wings reach in)
     const t = F.meta.target, mjd = F.meta.grid.mjd_ref, [tra, tde] = propagate(t.ra, t.dec, t.pmra, t.pmdec, t.epoch_mjd, mjd);
-    const near = F.meta.catalogs.gaia.map((s) => { const [ra, de] = propagate(s.ra, s.dec, s.pmra, s.pmdec, 57388.0, mjd); return { s, d: angSepDeg(tra, tde, ra, de) * 3600 }; })
-      .filter((o) => o.d > 1.5 && o.d < 2.5 * PIX).sort((a, b) => a.d - b.d).slice(0, 3);
+    return F.meta.catalogs.gaia.map((s) => { const [ra, de] = propagate(s.ra, s.dec, s.pmra, s.pmdec, 57388.0, mjd); return { s, d: angSepDeg(tra, tde, ra, de) * 3600 }; })
+      .filter((o) => o.d > 1.5 && (o.d < 3 * PIX || (o.d < 5 * PIX && o.s.g < 15))).sort((a, b) => a.d - b.d).slice(0, 3);
+  }
+  function renderBlendNote() {
+    // Warn when a catalogued star is close enough to blend with the target (see blendNeighbours)
+    const mjd = F.meta.grid.mjd_ref;
+    const near = blendNeighbours();
     const el = $('blendNote');
     $('blendBtn').classList.toggle('d-none', !near.length); el.classList.remove('show');
     el.textContent = near.length ? `Blend warning: ${near.map((o) => `Gaia DR3 ${o.s.id} (G=${o.s.g}) is ${o.d.toFixed(1)}″ away`).join('; ')} in ${mjdToDate(mjd).slice(0, 7)}. SPHEREx pixels are ${PIX}″, so their light overlaps; check the spectrum.` : '';
@@ -1282,6 +1370,8 @@
 
   // ---------------------------------------------------------------- go / input
   async function onGo() {
+    // a click on the sky map is not aimed at any object: ask the server to centre on the nearest Gaia star (it says so)
+    const snap = SNAP_NEXT; SNAP_NEXT = false;
     const msg = $('coordMsg'); const r = parseInput($('coordInput').value);
     if (!r) return setMsg(msg, 'Type coordinates or a name.', 'warning');
     if (r.error) return setMsg(msg, r.error, 'danger');
@@ -1296,7 +1386,7 @@
       if (!F || F.meta.key !== best.key) await openField(best.key, true);
       setPin(r.ra, r.dec); return;
     }
-    if (LIVE) { setMsg(msg, `Searching IRSA at ${r.ra.toFixed(4)} ${r.dec.toFixed(4)}…`, 'info'); return liveBuild({ ra: r.ra, dec: r.dec, size: +$('sizeSel').value || 9 }); }
+    if (LIVE) { setMsg(msg, `Searching IRSA at ${r.ra.toFixed(4)} ${r.dec.toFixed(4)}${snap ? ' (nearest star to your click)' : ''}…`, 'info'); return liveBuild({ ra: r.ra, dec: r.dec, size: +$('sizeSel').value || 9, snap: snap ? 1 : undefined }); }
     if (LIVE_URL) {
       const u = new URL(LIVE_URL + 'app.html'); u.searchParams.set('ra', r.ra.toFixed(5)); u.searchParams.set('dec', r.dec.toFixed(5));
       msg.className = 'form-text small text-warning';
@@ -1388,6 +1478,7 @@
     $('copyEmbedBtn').onclick = () => { const u = new URL(shareUrl(), location.href); u.searchParams.set('embed', '1'); copyText(`<iframe src="${u.toString()}" width="660" height="760" style="border:0" title="Skytrace SPHEREx viewer"></iframe>`, $('shareMsg'), 'Embed code copied.'); };
     $('copyCoordBtn').onclick = () => { if (!F) return; const [ra, dec] = F.meta.grid.crval; copyText(`${ra.toFixed(5)} ${dec.toFixed(5)}  (${raToHms(ra)} ${decToDms(dec)})`, $('shareMsg'), 'Centre coordinates copied.'); };
     $('specLog').addEventListener('change', (e) => { S.specLog = e.target.checked; drawSpectrum(); });
+    $('specBands').addEventListener('change', () => drawSpectrum());
     $('specClean').addEventListener('change', (e) => { S.specClean = e.target.checked; drawSpectrum(); });
     document.querySelectorAll('button[data-bs-toggle="tab"]').forEach((b) => b.addEventListener('shown.bs.tab', () => { if (window.Plotly) { Plotly.Plots.resize('specPlot'); Plotly.Plots.resize('lcPlot'); } }));
     window.addEventListener('resize', () => { drawOverlay(); drawBandStrip(); });
@@ -1478,7 +1569,7 @@
     mem.slice(0, 25).forEach((i) => { const e = ex[i]; L.push(`  ${e.obs_id}  D${e.det}  ${mjdToIso(e.mjd)} UTC  ${e.wave ? e.wave.toFixed(3) + ' um' : ''}  ${e.collection}`); });
     if (MOVERS.length) {
       L.push("Moving objects found by the multi-visit straight-line test (seen in >= 3 visits, motion >= 5 sigma):");
-      MOVERS.slice(0, 10).forEach((mv, k) => L.push(`  M${k + 1}  ${mv.ra.toFixed(5)} ${mv.dec.toFixed(5)}  motion ${mv.pm.toFixed(2)} +- ${mv.epm.toFixed(2)}"/yr (${mv.pmra.toFixed(0)}, ${mv.pmdec.toFixed(0)} mas/yr)  ${mv.sig.toFixed(1)} sigma  seen in ${mv.n}/${mv.covered} visits  ${mv.target ? 'target' : mv.gaia ? 'Gaia DR3 ' + mv.gaia.id : 'not in Gaia DR3'}`));
+      MOVERS.slice(0, 10).forEach((mv, k) => L.push(`  M${k + 1}  ${mv.ra.toFixed(5)} ${mv.dec.toFixed(5)}  motion ${mv.pm.toFixed(2)} +- ${mv.epm.toFixed(2)}"/yr (${mv.pmra.toFixed(0)}, ${mv.pmdec.toFixed(0)} mas/yr)  ${mv.sig.toFixed(1)} sigma  seen in ${mv.n}/${mv.covered} visits  ${mv.target ? 'target' : mv.gaia ? 'Gaia DR3 ' + mv.gaia.id : 'no match in the Gaia DR3 overlay'}`));
     }
     L.push('');
     L.push('Notes: ' + ($('reportNotes').value.trim() || '(none)'));
@@ -1591,12 +1682,13 @@
       }
       if (want.diff || want.visits) { Object.assign(S, { diff: keep.diff, dref: keep.dref, mode: keep.mode }); rebuild(); S.frame = Math.min(keep.frame, FRAMES.length - 1); renderFrame(); }
       if (want.channels) { drawBandStrip(); const c = $('bandStrip'); h1('102-channel coverage', 90); image(c.toDataURL('image/png'), TW, TW * c.height / c.width, `${$('bandStripInfo').textContent}. 0.75 um (left) to 5.0 um (right), detectors D1-D6.`); }
-      if (want.spectrum) { say('Drawing the spectrum…'); const u = await plotImage('specPlot'); h1('Spectrum', TW * 480 / 900 + 30); if (u) image(u, TW, TW * 480 / 900, SPEC_NOTE + ' Brightness of the target in every SPHEREx image (uJy) against wavelength; 2MASS and WISE points for comparison.'); else para('No spectrum: the target has no clean measurements (e.g. it saturates SPHEREx).'); }
+      if (want.spectrum) { say('Drawing the spectrum…'); const u = await plotImage('specPlot'); h1('Spectrum', TW * 480 / 900 + 30); if (u) image(u, TW, TW * 480 / 900, SPEC_NOTE + ' Brightness of the target in each SPHEREx image of this field (uJy) against wavelength; 2MASS and WISE points for comparison.'); else para('No spectrum: the target has no clean measurements (e.g. it saturates SPHEREx).'); }
       if (want.spectable) {
         h1('Spectrum values'); const rows = ex.map((e) => e).filter((e) => e.flux_ujy != null).sort((a, b) => a.wave - b.wave);
-        mono(['date (UTC)        det  lambda_um  chan   flux_uJy    err_uJy  n_bad', ...rows.map((e) => `${mjdToIso(e.mjd).padEnd(17)} ${String(e.det).padStart(3)}  ${(e.wave ?? 0).toFixed(4).padStart(9)}  ${String(e.band ?? '-').padStart(4)}  ${e.flux_ujy.toFixed(2).padStart(9)}  ${(e.flux_err ?? 0).toFixed(2).padStart(9)}  ${String(e.n_bad ?? '')}`)]);
+        para('Every measurement, clean or not; the last column says why a value is not used (bad_pixels, saturated, artifact, masked, outlier).');
+        mono(['date (UTC)        det  lambda_um  chan   flux_uJy    err_uJy  flags', ...rows.map((e) => `${mjdToIso(e.mjd).padEnd(17)} ${String(e.det).padStart(3)}  ${(e.wave ?? 0).toFixed(4).padStart(9)}  ${String(e.band ?? '-').padStart(4)}  ${e.flux_ujy.toFixed(2).padStart(9)}  ${(e.flux_err ?? 0).toFixed(2).padStart(9)}  ${flagsOf(e).join(',') || 'clean'}`)]);
       }
-      if (want.lightcurve) { drawLightCurve(); const u = await plotImage('lcPlot'); h1('Light curve', TW * 480 / 900 + 30); if (u) image(u, TW, TW * 480 / 900, 'Each clean measurement divided by the median of the target in the same SPHEREx channel: a steady source stays at 1.'); else para('No light curve: no channel has two or more clean measurements of the target.'); }
+      if (want.lightcurve) { drawLightCurve(); const u = await plotImage('lcPlot'); h1('Light curve', TW * 480 / 900 + 30); if (u) image(u, TW, TW * 480 / 900, 'Each clean measurement divided by the median of the target in the same SPHEREx channel: a steady source stays at 1.'); else para('No light curve. ' + ($('lcPlot').innerText || '').trim()); }
       if (want.movers) {
         h1('Moving objects'); const I = MOVER_INFO;
         if (!I) para((F.meta.catalog_warnings || []).some((w) => /Gaia/.test(w)) ? 'Not run: Gaia DR3 could not be fetched from NASA IRSA when this field was built, and the check needs it.' : 'Motion can only be tested with at least three visits.');
@@ -1658,7 +1750,7 @@
     rows.push(`# flux in microjansky (uJy); wavelength in micrometres at the target pixel; channel = official SPHEREx channel (1-102)`);
     rows.push(`# Catalogue rows: 2MASS / WISE (CatWISE2020) magnitudes converted with published zero points, matched at each catalogue epoch`);
     rows.push(['source', 'id', 'detector', 'date_utc', 'mjd', 'wavelength_um', 'bandwidth_um', 'channel', 'flux_uJy', 'flux_err_uJy', 'n_bad', 'photometry_flags', 'flags_at_target', 'collection', 'url'].join(','));
-    for (const e of m.exposures) rows.push(['SPHEREx', e.obs_id, e.det, e.date, e.mjd, e.wave, e.bw, e.band, e.flux_ujy, e.flux_err, e.n_bad, e.phot_flags, e.target_flags, e.collection, e.url].map(csvCell).join(','));
+    for (const e of m.exposures) rows.push(['SPHEREx', e.obs_id, e.det, e.date, e.mjd, e.wave, e.bw, e.band, e.flux_ujy, e.flux_err, e.n_bad, flagsOf(e), e.target_flags, e.collection, e.url].map(csvCell).join(','));
     for (const p of (m.sed || []).filter((q) => q.flux_ujy != null)) rows.push([p.band, p.id, '', '', p.mjd, p.wave, '', '', p.flux_ujy, p.err, '', p.qual ? 'ph_qual=' + p.qual : '', '', '', ''].map(csvCell).join(','));
     download(`skytrace-${m.key}-measurements.csv`, new Blob([rows.join('\n') + '\n'], { type: 'text/csv' }));
     setMsg($('shareMsg'), `Downloaded ${m.exposures.length} SPHEREx measurements.`, 'success');
@@ -1670,6 +1762,8 @@
     $('saveImgBtn').onclick = saveImage; $('saveCsvBtn').onclick = saveCsv;
     document.querySelectorAll('input[name=src]').forEach((r) => r.addEventListener('change', () => { if (r.checked) refreshSource(); }));
     $('srcBack').onclick = backToSpherex;
+    try { if (localStorage.getItem('skytrace-start') === '0') $('startHere').classList.add('d-none'); } catch (e) { /* storage unavailable */ }
+    $('startHereClose').onclick = () => { $('startHere').classList.add('d-none'); try { localStorage.setItem('skytrace-start', '0'); } catch (e) { /* storage unavailable */ } };
     const clock = () => { const c = $('hudClock'); if (c) c.textContent = new Date().toISOString().slice(11, 19); };
     clock(); setInterval(clock, 1000);
     const logo = (window.SKYTRACE_LOGO || '').trim();
@@ -1681,7 +1775,7 @@
     if (window.SkyJourney) {
       SkyJourney.attach($('veilSky'), { big: true, labels: true });
       SkyJourney.attach($('skyMap'), { labels: false, onPick: (ra, dec) => {
-        $('coordInput').value = `${ra.toFixed(4)} ${dec >= 0 ? '+' : ''}${dec.toFixed(4)}`; onGo();
+        $('coordInput').value = `${ra.toFixed(4)} ${dec >= 0 ? '+' : ''}${dec.toFixed(4)}`; SNAP_NEXT = true; onGo();
       } });
     }
     const p = readUrl();
@@ -1711,6 +1805,6 @@
     if (p.get('play') === '1') startPlay();
   }
   // Read-only hooks used by the automated browser tests (tests/ui_test.py)
-  window.__skytrace = { exportPdf, buildReport, saveCsv, saveImage, get F() { return F; }, get FRAMES() { return FRAMES; }, get VISITS() { return VISITS; }, S, world2pix, pix2world, parseInput, raToHms, decToDms, get MOVERS() { return MOVERS; }, get MOVER_INFO() { return MOVER_INFO; } };
+  window.__skytrace = { exportPdf, buildReport, saveCsv, saveImage, get F() { return F; }, get FRAMES() { return FRAMES; }, get VISITS() { return VISITS; }, S, world2pix, pix2world, parseInput, raToHms, decToDms, get MOVERS() { return MOVERS; }, get MOVER_INFO() { return MOVER_INFO; }, get playing() { return !!playTimer; } };
   boot();
 })();

@@ -21,10 +21,9 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from pipeline import Target, build_field, discover_collections, write_package
+from pipeline import Target, build_field, discover_collections, write_package, refresh_catalogs, sanitize, nearest_star
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
@@ -98,12 +97,23 @@ def _missing_catalogs(key: str) -> bool:
 @app.post("/api/field")
 def start_field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge=-90, le=90),
                 pmra: float = 0.0, pmdec: float = 0.0, epoch_mjd: float = 57388.0, plx: float = 0.0,
-                name: str | None = None, force: int = 0, size: int = 9):
+                name: str | None = None, force: int = 0, size: int = 9, snap: int = 0):
     if size not in FIELD_SIZES:
         raise HTTPException(400, f"size must be one of {sorted(FIELD_SIZES)} arcmin")
+    snapped = None
+    if snap:   # a click on the all-sky map: measure the nearest real star (Gaia DR3, G < 18, within 90") instead of empty sky
+        try:
+            snapped = nearest_star(ra, dec)
+        except Exception as exc:
+            print(f"[warn] nearest star: {exc}")
+        if snapped:
+            click = (ra, dec)
+            ra, dec, pmra, pmdec, plx, epoch_mjd = snapped["ra"], snapped["dec"], snapped["pmra"], snapped["pmdec"], snapped["plx"], 57388.0
     key = field_key(ra, dec, pmra, pmdec, size)
-    if not force and (DATA / f"{key}.json").exists() and not _missing_catalogs(key):
-        return {"id": None, "status": "done", "key": key, "message": "cached"}
+    if not force and (DATA / f"{key}.json").exists():
+        if not _missing_catalogs(key):
+            return {"id": None, "status": "done", "key": key, "message": "cached"}
+        return refresh_catalogs_job(key)    # images are fine; only fetch the catalogues that failed
     running = [j for j in JOBS.values() if j["status"] == "running"]
     for j in running:
         if j["key"] == key:
@@ -116,7 +126,13 @@ def start_field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge
     # Shared, public list: only the Explore menu's own label format is accepted; visitors' personal names stay in their browser.
     ok_name = name and re.fullmatch(r"Fast star \d{1,2}\.\d{2}″/yr \(Gaia DR3 \d{6,20}\)", name)
     label = name if ok_name else f"RA {ra:.4f} Dec {dec:+.4f}"
-    tgt = Target(key, label, ra, dec, pmra, pmdec, epoch_mjd, note="User search.", source="Coordinates entered by user", plx=plx)
+    note, source = "User search.", "Coordinates entered by user"
+    if snapped:
+        label = f"Gaia DR3 {snapped['id']}"
+        note = (f"You clicked the sky map at RA {click[0]:.4f} Dec {click[1]:+.4f}. The measurements follow the nearest star in "
+                f"Gaia DR3 (G = {snapped['g']}), {snapped['sep']}\u2033 from the click, with its Gaia motion and parallax.")
+        source = "Nearest Gaia DR3 star to a sky-map click"
+    tgt = Target(key, label, ra, dec, pmra, pmdec, epoch_mjd, note=note, source=source, plx=plx)
 
     def run():
         try:
@@ -124,6 +140,35 @@ def start_field(ra: float = Query(..., ge=0, lt=360), dec: float = Query(..., ge
             write_package(pkg, str(DATA))
             _add_to_index(pkg["meta"])
             job.update(status="done", message=f"Done: {len(pkg['meta']['exposures'])} exposures")
+        except Exception as exc:
+            job.update(status="error", message=str(exc))
+    threading.Thread(target=run, daemon=True).start()
+    return job
+
+
+@app.post("/api/catalogs")
+def refresh_catalogs_job(key: str = Query(..., pattern=r"^[A-Za-z0-9_]{1,40}$")):
+    """Fetch the catalogue overlays again for a field built while IRSA's catalogue service failed (seconds, not minutes:
+    the SPHEREx images are not read again)."""
+    path = DATA / f"{key}.json"
+    if not path.exists():
+        raise HTTPException(404, "Unknown field")
+    for j in JOBS.values():
+        if j["status"] == "running" and j["key"] == key:
+            return j
+    jid = uuid.uuid4().hex[:12]
+    job = {"id": jid, "status": "running", "key": key, "message": "Fetching the star catalogues again from NASA IRSA…", "started": time.time()}
+    JOBS[jid] = job
+
+    def run():
+        try:
+            meta = refresh_catalogs(json.loads(path.read_text()))
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(sanitize(meta), separators=(",", ":"), allow_nan=False))
+            tmp.replace(path)
+            c = meta["catalogs"]
+            msg = f"Catalogues: {len(c['gaia'])} Gaia DR3, {len(c['catwise'])} CatWISE2020, {len(c['tmass'])} 2MASS"
+            job.update(status="done", message=msg + ("; still unavailable: " + "; ".join(meta["catalog_warnings"]) if meta["catalog_warnings"] else ""))
         except Exception as exc:
             job.update(status="error", message=str(exc))
     threading.Thread(target=run, daemon=True).start()

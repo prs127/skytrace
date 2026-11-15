@@ -101,6 +101,7 @@ def flag_names(value: int) -> list[str]:
 # --------------------------------------------------------------------------
 # Archive discovery and search
 # --------------------------------------------------------------------------
+SIA_TIMEOUT = 90           # seconds before an unanswered IRSA image search is retried
 KNOWN_COLLECTIONS = ("spherex_dr1", "spherex_dr1_deep", "spherex_qr3", "spherex_qr3_deep")
 _COLLECTIONS_CACHE = None
 
@@ -119,7 +120,12 @@ def discover_collections() -> list[str]:
     # IRSA's TAP front end returns intermittent "502 Proxy Error" (seen 15 Nov 2026: 2 of 3 calls).
     for attempt in range(6):
         try:
-            cols = [str(c) for c in Irsa.list_collections(servicetype="SIA", filter="spherex")["collection"]]
+            ex1 = ThreadPoolExecutor(max_workers=1)   # IRSA's TAP service can stop answering: never wait more than 45 s
+            try:
+                tab = ex1.submit(Irsa.list_collections, servicetype="SIA", filter="spherex").result(timeout=45)
+            finally:
+                ex1.shutdown(wait=False)
+            cols = [str(c) for c in tab["collection"]]
             break
         except Exception as exc:
             err = exc
@@ -150,22 +156,31 @@ def query_exposures(ra: float, dec: float, collections: list[str]):
     from astroquery.ipac.irsa import Irsa
     from astropy.table import vstack
     c = SkyCoord(ra, dec, unit="deg")
-    tabs = []
-    for coll in collections:
+
+    def one(coll):
         # Retry transient network errors; if a collection still fails, stop rather than silently
         # building a field from partial data (found in verification: a dropped DR1 query left
         # Epsilon Indi B with 120 of its 458 exposures).
-        # IRSA's front end returned "502 Proxy Error" for about half of all requests on 15 Nov 2026, so allow 8 tries
+        # IRSA's front end returned "502 Proxy Error" for about half of all requests on 15 Nov 2026, and single
+        # answers took 3-55 s, so: up to 8 tries, each abandoned after SIA_TIMEOUT s if IRSA does not answer.
         for attempt in range(8):
+            ex1 = ThreadPoolExecutor(max_workers=1)
             try:
-                t = Irsa.query_sia(pos=(c, 1 * u.arcsec), collection=coll)
-                break
+                return ex1.submit(Irsa.query_sia, pos=(c, 1 * u.arcsec), collection=coll).result(timeout=SIA_TIMEOUT)
             except Exception as exc:
-                print(f"[warn] SIA {coll} attempt {attempt + 1}: {exc}")
+                print(f"[warn] SIA {coll} attempt {attempt + 1}: {type(exc).__name__} {exc}")
                 time.sleep(min(2 + 2 * attempt, 10) + random.random())
-        else:
-            raise RuntimeError(f"NASA IRSA's archive did not answer for {coll} after 8 tries (IRSA server error). "
-                               "Nothing was built from partial data; please try again in a few minutes.")
+            finally:
+                ex1.shutdown(wait=False)
+        raise RuntimeError(f"NASA IRSA's archive did not answer for {coll} after 8 tries (IRSA server error). "
+                           "Nothing was built from partial data; please try again in a few minutes.")
+
+    # the collections are queried at the same time (the wait is the slowest answer, not the sum of all of them);
+    # results are combined in the original order so the release preference below is unchanged
+    with ThreadPoolExecutor(max_workers=max(1, len(collections))) as pool:
+        results = list(pool.map(one, collections))
+    tabs = []
+    for t in results:
         if len(t):
             t = t[[k for k in ("obs_id", "energy_bandpassname", "t_min", "t_max", "em_min",
                                "em_max", "access_url", "cloud_access", "obs_collection")]]
@@ -378,6 +393,11 @@ def fetch_stamp(row, grid_wcs: WCS, npix: int, target_track, retries: int = 3) -
     if good_sky.sum() > 20:
         sky = np.median(sci[good_sky])
         mad = np.median(np.abs(sci[good_sky] - sky)) * 1.4826
+    elif (~bad).sum() > 20:
+        # crowded fields (e.g. towards the Galactic centre) have almost every pixel flagged SOURCE: use all unmasked
+        # pixels; the noise is then an overestimate (stars included), which only makes this image's weight smaller
+        sky = np.median(sci[~bad])
+        mad = np.median(np.abs(sci[~bad] - sky)) * 1.4826
     else:
         sky = np.nanmedian(sci[~bad]) if (~bad).any() else 0.0
         mad = np.nan
@@ -427,8 +447,6 @@ def fetch_stamp(row, grid_wcs: WCS, npix: int, target_track, retries: int = 3) -
         box = flg[max(0, iyt - 1):iyt + 2, max(0, ixt - 1):ixt + 2]
         tflag = int(np.bitwise_or.reduce(box.ravel()))
 
-    em_min = float(row["em_min"]) * 1e6
-    em_max = float(row["em_max"]) * 1e6
     meta = {
         "obs_id": str(row["obs_id"]), "det": det, "mjd": round(mjd, 5),
         "date": Time(mjd, format="mjd").isot[:16],
@@ -457,7 +475,7 @@ def earth_au(mjd):
 R_AP, R_IN, R_OUT = 3.0, 7.0, 16.0     # pixels; smallest notebook radius and the notebook annulus
 PHOT_DESC = ("IRSA SPHEREx Source Discovery Tool method on native detector pixels: per-pixel solid-angle map "
              f"(release-matched, currently cal-sapm-v3-2026-191), r={R_AP:g} px aperture (photutils subpixel x5), {R_IN:g}-{R_OUT:g} px annulus "
-             "(sigma-clipped median), error from VARIANCE, n_bad = aperture pixels with CONTAINS_BAD_PIXEL flags; then divided by the ePSF encircled energy")
+             "(sigma-clipped median), error from VARIANCE, n_bad = aperture pixels with CONTAINS_BAD_PIXEL flags, counted over every pixel that contributes to the sum; then divided by the ePSF encircled energy")
 UJY_PER_MJYSR_ARCSEC2 = 1e12 * (math.pi / 180 / 3600) ** 2   # = 23.5044 uJy per (MJy/sr x arcsec^2)
 
 
@@ -529,7 +547,8 @@ def aperture_phot(img, cat, x, y, omega_arcsec2, var=None, nbad_map=None, r_ap=R
       3. flux = photutils aperture_photometry(method='subpixel', subpixels=5, mask=bad) - median x area
       4. error = sqrt( aperture sum of scaled VARIANCE )   (same subpixel aperture)
     Only non-finite pixels are excluded, exactly as in the notebook. As in the notebook (grab_star /
-    plot_spectrum), n_bad = number of aperture pixels ('center' method) carrying any CONTAINS_BAD_PIXEL flag;
+    plot_spectrum), n_bad = number of aperture pixels carrying any CONTAINS_BAD_PIXEL flag (counted over every pixel
+    that contributes to the sum, which is stricter than the notebook's 'center' count; see below);
     a measurement with n_bad >= 1 gets the 'bad_pixels' flag and is hidden by default in the UI."""
     from astropy.stats import sigma_clipped_stats
     from photutils.aperture import CircularAperture, CircularAnnulus, aperture_photometry as _ap
@@ -542,7 +561,11 @@ def aperture_phot(img, cat, x, y, omega_arcsec2, var=None, nbad_map=None, r_ap=R
     bad = ~np.isfinite(img)
     pos = [(float(x), float(y))]
     ap = CircularAperture(pos, r=r_ap)
-    apm = ap.to_mask(method="center")[0]
+    # Pixels checked for flags = every pixel that adds to the flux sum below (subpixel x5), not only those whose
+    # centre is inside r = 3 px as in the notebook. Found on 15 Nov 2026 (random field RA 338.1192 Dec +22.8893):
+    # a cosmic-ray pixel (TRANSIENT, value 574 MJy/sr) centred 3.07 px from the target was outside the notebook's
+    # check but partly inside the aperture sum, giving an unflagged flux 225 times too high.
+    apm = ap.to_mask(method="subpixel", subpixels=5)[0]
     inside = apm.to_image((ny, nx))
     inside = inside > 0 if inside is not None else np.zeros((ny, nx), bool)
     n_bad = int((nbad_map & inside).sum()) if nbad_map is not None else 0
@@ -580,12 +603,25 @@ def aperture_phot(img, cat, x, y, omega_arcsec2, var=None, nbad_map=None, r_ap=R
 # --------------------------------------------------------------------------
 from concurrent.futures import ThreadPoolExecutor as _TPE
 _TAP_POOL = _TPE(max_workers=6)
+
+
+def _tap_session():
+    """requests session whose every call has a time limit. Without one, a TAP request that IRSA never answers blocks
+    its worker thread for ever; after a few such requests all 6 workers are stuck and every later catalogue query
+    times out, even after IRSA recovers (found in testing on 15 Nov 2026, when IRSA's TAP service stopped answering)."""
+    import requests
+
+    class _S(requests.Session):
+        def request(self, *a, **kw):
+            kw.setdefault("timeout", (15, 75))   # connect, read (seconds)
+            return super().request(*a, **kw)
+    return _S()
 TAP_TIMEOUT = 180   # seconds per catalogue query
 
 
 def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0, top=400):
     import pyvo
-    tap = pyvo.dal.TAPService(TAP_URL)
+    tap = pyvo.dal.TAPService(TAP_URL, session=_tap_session())
     out = {"gaia": [], "catwise": [], "tmass": []}
     # the three IRSA TAP queries run at the same time, each with a time limit: a slow catalogue service then costs
     # at most TAP_TIMEOUT seconds and the field is still built (that overlay is empty and a warning is recorded)
@@ -601,8 +637,35 @@ def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0, top=40
              f"FROM fp_psc WHERE 1=CONTAINS(POINT('ICRS',ra,dec),"
              f"CIRCLE('ICRS',{ra},{dec},{radius_deg})) AND k_m < {kmax} ORDER BY k_m"),
     }
-    def run(q):   # IRSA TAP gives intermittent "502 Proxy Error"; retry transient failures, stay inside TAP_TIMEOUT
+    # The same catalogues are also served by IRSA's Gator cone-search service (a separate front end from TAP). On
+    # 15 Nov 2026 TAP stopped answering while Gator answered in about 1 s, so Gator is asked first and TAP is the
+    # fallback. Both return rows of the same IRSA tables; tests/catalog_services_check.py compares them.
+    gator = {"gaia": ("gaia_dr3_source", "source_id,ra,dec,pmra,pmdec,parallax,phot_g_mean_mag", f"phot_g_mean_mag<{gmax}", "phot_g_mean_mag"),
+             "catwise": ("catwise_2020", "source_name,ra,dec,ra_pm,dec_pm,pmra,pmdec,w1mpro,w2mpro,w1sigmpro,w2sigmpro,meanobsmjd", f"w2mpro<{w2max}", "w2mpro"),
+             "tmass": ("fp_psc", "designation,ra,dec,j_m,j_msigcom,h_m,h_msigcom,k_m,k_msigcom,jdate,ph_qual,cc_flg", f"k_m<{kmax}", "k_m")}
+
+    def run_gator(k):
+        import requests
+        from astropy.io import ascii as _ascii
+        cat, cols, where, order = gator[k]
+        r = requests.get("https://irsa.ipac.caltech.edu/cgi-bin/Gator/nph-query", timeout=(15, 60), params={
+            "catalog": cat, "spatial": "cone", "objstr": f"{ra:.7f} {dec:+.7f}", "radius": f"{radius_deg * 3600:.3f}",
+            "radunits": "arcsec", "outfmt": 1, "selcols": cols, "constraints": where})
+        r.raise_for_status()
+        if "[struct stat=" in r.text[:300] or "ERROR" in r.text[:300]:
+            raise RuntimeError("Gator: " + r.text[:200])
+        t = _ascii.read(r.text, format="ipac")
+        t.sort(order)
+        return t[:top]
+
+    def run(k, q):   # Gator first; then IRSA TAP with retries of transient failures, inside TAP_TIMEOUT
         t0 = time.time()
+        for attempt in range(2):
+            try:
+                return run_gator(k)
+            except Exception as exc:
+                print(f"[warn] Gator {k} attempt {attempt + 1}: {type(exc).__name__} {str(exc)[:150]}")
+                time.sleep(1.5)
         for attempt in range(8):
             try:
                 return tap.run_sync(q).to_table()
@@ -611,7 +674,7 @@ def query_catalogs(ra, dec, radius_deg, gmax=20.0, w2max=16.5, kmax=16.0, top=40
                     raise
                 print(f"[warn] TAP attempt {attempt + 1}: {exc}")
                 time.sleep(2 * (attempt + 1))
-    futs = {k: _TAP_POOL.submit(run, q) for k, q in queries.items()}
+    futs = {k: _TAP_POOL.submit(run, k, q) for k, q in queries.items()}
     out["warnings"] = []
     try:
         for r in futs["gaia"].result(timeout=TAP_TIMEOUT):
@@ -796,6 +859,47 @@ def build_field(t: Target, npix: int = 89, workers: int = 32, max_exposures: int
     imgs = np.stack([s.image for s in stamps]).astype("<f2") if stamps else np.zeros((0, npix, npix), "<f2")
     cats_arr = np.stack([s.cat for s in stamps]).astype(np.uint8) if stamps else np.zeros((0, npix, npix), np.uint8)
     return {"meta": meta, "images": imgs, "cats": cats_arr}
+
+
+def nearest_star(ra, dec, radius_arcsec=90.0, gmax=18.0):
+    """Nearest Gaia DR3 star (G < gmax) to a position, from IRSA's Gator service, or None. Used when someone clicks the
+    all-sky map: a click is not aimed at any object, so the measurements follow the nearest real star instead of empty
+    sky, and the page says so (name, Gaia id, distance from the click)."""
+    import requests
+    from astropy.io import ascii as _ascii
+    r = requests.get("https://irsa.ipac.caltech.edu/cgi-bin/Gator/nph-query", timeout=(15, 45), params={
+        "catalog": "gaia_dr3_source", "spatial": "cone", "objstr": f"{ra:.7f} {dec:+.7f}", "radius": f"{radius_arcsec:.1f}",
+        "radunits": "arcsec", "outfmt": 1, "selcols": "source_id,ra,dec,pmra,pmdec,parallax,phot_g_mean_mag",
+        "constraints": f"phot_g_mean_mag<{gmax}"})
+    r.raise_for_status()
+    t = _ascii.read(r.text, format="ipac")
+    if not len(t):
+        return None
+    c0 = SkyCoord(ra, dec, unit="deg"); sep = c0.separation(SkyCoord(t["ra"], t["dec"], unit="deg")).arcsec
+    s = t[int(np.argmin(sep))]
+    num = lambda v: float(v) if not np.ma.is_masked(v) and np.isfinite(float(v)) else 0.0
+    return {"id": str(s["source_id"]), "ra": float(s["ra"]), "dec": float(s["dec"]), "pmra": num(s["pmra"]), "pmdec": num(s["pmdec"]),
+            "plx": num(s["parallax"]), "g": round(float(s["phot_g_mean_mag"]), 2), "sep": round(float(sep.min()), 1)}
+
+
+def refresh_catalogs(meta: dict) -> dict:
+    """Fetch the Gaia DR3 / CatWISE2020 / 2MASS overlays (and the SED points built from them) again for a field whose
+    catalogue query failed at build time, without re-reading any SPHEREx image. A catalogue that fails again keeps its
+    previous content, and its warning stays, so nothing is silently lost or invented."""
+    g = meta["grid"]; npix = g["npix"]
+    radius = npix * PIXSCALE_ARCSEC / 3600 / math.sqrt(2) + 0.01
+    cats = query_catalogs(g["crval"][0], g["crval"][1], radius, top=int(400 * (npix / 89) ** 2))
+    warn = cats.pop("warnings", [])
+    names = {"gaia": "Gaia DR3", "catwise": "CatWISE2020", "tmass": "2MASS"}
+    old = meta.get("catalogs") or {}
+    for k, label in names.items():
+        failed = any(w.startswith(label) for w in warn)
+        if failed:
+            cats[k] = old.get(k, [])
+    meta["catalogs"] = cats
+    meta["catalog_warnings"] = warn
+    meta["sed"] = catalog_sed(meta["target"], cats)
+    return meta
 
 
 def write_package(pkg: dict, outdir: str):

@@ -17,7 +17,7 @@ sections 4–5 cover judging.
 | 6 | Channels and wavelengths | Wavelength at the target pixel from WCS-WAVE (`key="W"`, `sip=None`, as in the notebooks); channel from the official per-pixel CHANNEL_MAP | Our 102-channel table = official SPECTRAL_CHANNELS (0.00 nm); channel = official map in 52/52 sampled exposures (`channel_check.py`). Earlier "nearest centre" rule disagreed in 3/52 (boundary/edge pixels): replaced | The LVF changes wavelength across the field: ≤ 0.47 channel widths (0.4–1.3%) at the corners of the full 9.1′ view (stated in the help text) |
 | 7 | Positions and motion | Grid WCS; target = proper motion + annual parallax from Earth's ephemeris (astropy); Gaia stars likewise | Parallax formula = astropy GCRS to 0.05 mas; Gaia stars land ≤ 0.04 px from SPHEREx peaks; target marker vs measured centroid 0.09–0.14 px for Epsilon Indi B (better than motion-only in all 4 visits) | Parallax is ≤ 0.09 px for these targets, at the level of centroid noise; WISE 0855 centroids are pulled by a G = 16.3 star 7.7″ away (blend warning shown) |
 | 8 | WISE 0855 distance and motion | Fit of position, motion and parallax to 277 NEOWISE-R detections | Parallax 438 ± 36 mas vs published 438.9 ± 3.0 (Kirkpatrick et al. 2019); motion within 1.4σ of published | Our parallax is 12× less precise than Spitzer's (stated as our measurement) |
-| 9 | Target brightness (spectrum) | IRSA Source Discovery Tool method on original pixels: per-pixel solid-angle map, r = 3 px subpixel aperture, 7–16 px σ-clipped annulus, VARIANCE errors, `n_bad` rule; ÷ ePSF encircled energy (our only addition, 0.4–1.4%) | `notebook_parity.py`: = notebook functions to ≤ 2×10⁻⁶ (flux and error), bad-pixel decision 47/47; official DR1 spectral cube 0.997 / 1.010; 2MASS J/H/Ks and WISE W1/W2 0.98–1.03 (`sed_check.py`); DR1 vs QR3 same-channel ratio 1.000 (M101 nucleus) and 1.006 (Eps Indi B): no calibration step between releases | Errors are statistical (VARIANCE) only, as in the notebook; saturated targets (Barnard, R Dra) withheld, as the notebook's `n_bad = 0` rule implies |
+| 9 | Target brightness (spectrum) | IRSA Source Discovery Tool method on original pixels: per-pixel solid-angle map, r = 3 px subpixel aperture, 7–16 px σ-clipped annulus, VARIANCE errors, `n_bad` rule; ÷ ePSF encircled energy (our only addition, 0.4–1.4%) | `notebook_parity.py`: = notebook functions to ≤ 2×10⁻⁶ (flux and error), bad-pixel decision: every measurement the notebook flags is flagged by Skytrace too (36/36 in 3 fields re-checked 15 Nov evening; Skytrace's check is stricter, see below); official DR1 spectral cube 0.997 / 1.010; 2MASS J/H/Ks and WISE W1/W2 0.98–1.03 (`sed_check.py`); DR1 vs QR3 same-channel ratio 1.000 (M101 nucleus) and 1.006 (Eps Indi B): no calibration step between releases | Errors are statistical (VARIANCE) only, as in the notebook; saturated targets (Barnard, R Dra) withheld, as the notebook's `n_bad = 0` rule implies |
 | 10 | 2MASS / WISE points | Catalogue magnitudes × published zero points; target matched at each catalogue's own epoch with its motion; CatWISE motion-fit positions (`ra_pm`, MJD 57170) | Barnard's Star found in 2MASS at 0.3″ after ~170″ of motion; ambiguous CatWISE matches refused (WISE 0855: 3 entries) | Broad bands vs narrow channels; catalogue epochs differ from SPHEREx (stated) |
 | 11 | Light curve | Each clean point ÷ median of the same star in the same channel, so spectral shape cannot imitate variability | Fixed in this audit: the earlier version plotted raw flux per detector, mixing 17 channels | Needs ≥ 2 points per channel |
 | 12 | Shift-and-add | Resample each exposure along a trial motion | Moving target fixed to ≤ 0.15 px per visit (Eps Indi B), drifts 0.77 px without | Trial motion is linear (no parallax), as in WiseView |
@@ -141,6 +141,47 @@ Skytrace now retries every IRSA call with growing waits, never builds a field fr
 field whose catalogue lookup failed the next time it is requested, and the moving-object check refuses to run if
 Gaia DR3 is missing (it needs Gaia stars to line up the visits and to label known stars). Pre-built targets do not
 depend on IRSA.
+
+### Full re-check, 15 Nov 2026 evening (all analysis tools on 15 fields)
+`tests/tools_check.py` checks every analysis tool against an independent Python computation from the same data, on the
+6 challenge fields and 9 random positions (8 drawn uniformly over the sky, plus the Galactic centre): visit grouping,
+spectrum points and values, light-curve points and values, moving objects (browser = Python reference, every report
+meets the stated tests), exposures table, Sources tab, every frame mode, difference, shift-and-add, CSV, report, Atlas,
+comparison survey and the full PDF. `tests/every_control.py` clicks every control (80 checks). Found and fixed:
+- **Light curve at an empty position** drew noise divided by its own median (scatter 23×). Now a channel is used only
+  if the target is detected at ≥ 5σ there; otherwise the tab says no source is detected.
+- **Light curve of saturated stars** (Barnard's Star, R Draconis: every measurement saturated; RW Aurigae: 8 usable
+  points) is withheld and the tab says why; the guide no longer claims a light curve for R Draconis.
+- **Catalogue queries could block for ever**: IRSA's TAP service stopped answering; requests had no time limit, so after
+  a few the worker threads were all stuck and every later catalogue query failed. All requests now have time limits, and
+  the catalogues are asked first from IRSA's Gator service (answered in ~1 s while TAP was down); TAP is the fallback.
+  Gator and TAP give the same sources and values on all 6 challenge fields (`tests/catalog_services_check.py`; values
+  differ only in the last printed digit because TAP sends binary float32).
+- **Fields built without catalogues** can fetch them again in seconds (images kept), from the Moving objects and
+  Sources tabs or automatically on the next request.
+- **IRSA image search**: the four SPHEREx collections are queried at the same time with a 90 s limit per try (a single
+  random field now builds in about 90 s instead of several minutes when IRSA is slow).
+- **Crowded fields** (Galactic centre): almost every pixel is flagged SOURCE, so no image had a noise estimate; noise is
+  now estimated from all unmasked pixels there.
+- **Saved places**: a new user could not save into the starter folder (it got a new id every time it was read).
+Results: tools_check 15 fields, every_control 80/80, user_walkthrough 70/70, settings_sweep 3 × 72/72, movers_parity 0
+mismatches on 12 fields, catalog_services_check 0 differences.
+
+### New-user test with random sky-map clicks, 15 Nov 2026 night
+Following the guide as a first-time user on random positions found three more problems, all fixed:
+- **An unflagged value 225 times too bright.** At a random position (RA 338.1192, Dec +22.8893) one D5 measurement read
+  204,732 µJy against a median of 912 µJy, with no flag. Cause: a cosmic-ray pixel (TRANSIENT, 574 MJy/sr) centred 3.07 px
+  from the target. The notebook's bad-pixel count (and ours, copied from it) only checks pixels whose centre is inside
+  r = 3 px, but the flux sum (subpixel method) takes part of that pixel. Skytrace now checks every pixel that adds to the
+  sum. All 22 fields were re-measured from the original files (`backend/rephot.py`): every flux reproduced exactly
+  (difference 0), and 4-9 % of values per field are now flagged and hidden by default.
+- **Unflagged outliers.** A value far from the same visit's other values at nearly the same wavelength (> 5× local
+  scatter and > 3× its error, within 4 % and 15 days) is marked *outlier* and hidden like a flagged one: 6 of ~3,000 clean
+  values in 16 fields, all in D5/D6. The PDF table lists every value with its flags.
+- **Random clicks measured empty sky.** A sky-map click now centres the field on the nearest Gaia DR3 star (G < 18,
+  within 90″), measures that star, and says so in the field name and note. Typed coordinates are measured exactly.
+- During this test NASA IRSA's image search (SIA) and TAP returned 502 for every request; new searches could not be
+  built until IRSA recovers. Already-built fields and the six challenge targets work.
 
 ## 7. Ideas considered and not built (and why)
 - **Community database of candidates, ratings and favourites:** left out for this deadline (needs accounts, moderation

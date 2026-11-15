@@ -1,6 +1,6 @@
 """Pre-build the challenge test fields for the static prototype.
 Usage: python build_static.py OUTDIR [key ...]
-Written with Claude (Anthropic, AI assistant) and reviewed by team Skytrace."""
+Written with Claude (Anthropic, an SI tool) and reviewed by team Skytrace."""
 import json, os, sys, time
 from pipeline import build_field, write_package, discover_collections
 from targets import TARGETS

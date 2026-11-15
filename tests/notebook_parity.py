@@ -16,7 +16,7 @@ m = json.load(open(os.path.join(os.environ.get("SKYTRACE_DATA", "/home/claude/sk
 ex = m["exposures"]; sel = [ex[i] for i in np.linspace(0, len(ex) - 1, 12).astype(int)]
 import targets
 T = [t for t in targets.TARGETS if t.key == tgt][0]
-rows = []; zrat = []; agree = []
+rows = []; zrat = []; agree = []; extra = []
 for e in sel:
     ca = json.dumps({"aws": {"bucket_name": "nasa-irsa-spherex", "key": e["url"].split("/ibe/data/spherex/")[1]}})
     with fits.open(P._s3_path(ca), use_fsspec=True, fsspec_kwargs={"anon": True}) as h:
@@ -48,11 +48,12 @@ for e in sel:
     # --- Skytrace as run in the pipeline (zodi model subtracted first) ---
     rz = P.aperture_phot(img - zod, np.zeros(img.shape, np.uint8), pos[0][0], pos[0][1], sa, var=var)
     zrat.append(rz["flux"] / r["flux"] if r["flux"] else np.nan)
-    agree.append((nb_bad >= 1) == (r["n_bad"] >= 1))
+    # Skytrace checks every pixel that adds to the sum (stricter): it must flag whenever the notebook flags
+    agree.append((nb_bad < 1) or (r["n_bad"] >= 1)); extra.append((nb_bad < 1) and (r["n_bad"] >= 1))
     if r["flux"] is None:
         print(f"{e['obs_id']:>28} D{det} notebook {nb_flux:12.3f}  skytrace -- withheld, flags {r['flags']} (NaN pixels: {int((~np.isfinite(img)).sum())})"); continue
     rows.append((e["obs_id"], det, nb_flux, r["flux"], nb_err, r["err"]))
     print(f"{e['obs_id']:>28} D{det} notebook {nb_flux:12.3f} ± {nb_err:8.3f}  skytrace {r['flux']:12.3f} ± {r['err']:8.3f}  ratio {r['flux']/nb_flux:.6f}")
 rat = np.array([r[3] / r[2] for r in rows]); erat = np.array([r[5] / r[4] for r in rows])
-print(f"{tgt}: bad-pixel decision (n_bad>=1) agrees with notebook extract_dqf in {sum(agree)}/{len(agree)}; zodi pre-subtraction changes flux by max {np.nanmax(np.abs(np.array(zrat)-1)):.2e}")
+print(f"{tgt}: every measurement the notebook flags is flagged by Skytrace too: {sum(agree)}/{len(agree)} (Skytrace flags {sum(extra)} more, from pixels only partly inside the aperture); zodi pre-subtraction changes flux by max {np.nanmax(np.abs(np.array(zrat)-1)):.2e}")
 print(f"\n{tgt}: n={len(rows)}  flux ratio max|1-r| = {np.max(np.abs(1-rat)):.2e}   err ratio max|1-r| = {np.max(np.abs(1-erat)):.2e}")

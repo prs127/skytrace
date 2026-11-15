@@ -175,7 +175,7 @@ async def run_pass(pg, key, res):
     await pg.click('[data-bs-target="#tabSpec"]'); await pg.wait_for_timeout(300)
     r = await pg.evaluate(f"""(() => {{ const T = {sk}, ex = T.F.meta.exposures, d = document.getElementById('specPlot').data;
         const plotted = d.filter(t => /^V\\d/.test(t.name)).reduce((s, t) => s + t.x.length, 0);
-        const clean = ex.filter(e => e.flux_ujy !== null && e.wave && !(e.phot_flags && e.phot_flags.length)).length;
+        const clean = ex.filter(e => e.flux_ujy !== null && e.wave && !(e.phot_flags && e.phot_flags.length) && !e._outlier).length;   // outliers: see markOutliers (checked in Python by tools_check.py)
         const cat = d.filter(t => /2MASS|WISE/.test(t.name)).reduce((s, t) => s + t.x.length, 0);
         const sed = (T.F.meta.sed || []).filter(p => p.flux_ujy != null).length;
         return {{plotted, clean, cat, sed}}; }})()""")

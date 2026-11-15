@@ -6,7 +6,7 @@
       <ul><li>Type a <b>target name</b> (e.g. <code>WISE 0855</code>, <code>Barnard</code>) or <b>coordinates</b>: degrees (<code>133.795 -7.245</code>)
       or hours/degrees (<code>08h55m10.8s -07d14m42s</code>, <code>08:55:10.8 -07:14:42</code>). Press <b>Search</b> or Enter.</li>
       <li><b>Field size</b> (9′, 15′, 20′) is used for new archive searches: a bigger field can follow faster-moving objects but takes longer to download.</li>
-      <li>A new place is fetched live from NASA's IRSA archive: about 1–2 minutes for 300–400 SPHEREx images at 9′, longer for bigger fields.
+      <li>A new place is fetched live from NASA's IRSA archive: usually a few minutes for 300–400 SPHEREx images at 9′, longer for bigger fields or when IRSA is slow.
       It then appears in <b>Your searches</b> in the Library.</li></ul>`,
     sky: `<b>Where you are on the whole sky.</b>
       <ul><li>The oval is the entire sky (RA across, Dec up). The yellow ring is your current target.</li>
@@ -35,7 +35,7 @@
       <li><b>Same brightness scale</b>: keeps one scale for every frame, so real brightness changes are visible while blinking.</li></ul>`,
     overlays: `<b>Layers drawn on top of the image.</b> Click a chip to switch a layer on (✓) or off. None of them changes the data.
       <ul><li><b>Target</b> (yellow crosshair): where the target should be on that frame's date, from its catalogue proper motion and parallax.</li>
-      <li><b>Gaia DR3</b> (blue circles) and <b>CatWISE</b> (orange squares): known stars and infrared sources, moved to each frame's date. A dot with no marker is not in these catalogues.</li>
+      <li><b>Gaia DR3</b> (blue circles) and <b>CatWISE</b> (orange squares): known stars and infrared sources, moved to each frame's date. A dot with no marker is not in the overlays (the brightest 400 stars of each catalogue in the field), which does not by itself make it new.</li>
       <li><b>2MASS</b> (white diamonds): where sources were in 1997–2001. A fast-moving star has left its diamond.</li>
       <li><b>Flags</b>: SPHEREx's own pixel warnings: red saturated, yellow artefact (ghost, halo, streak…), grey masked. Don't trust anything inside them.</li>
       <li><b>Movers</b> (pink): tracks found by the motion test in the <i>Moving objects</i> tab. <b>Compass</b>: north and east arrows and a 1′ bar.</li></ul>`,
@@ -54,7 +54,7 @@
       <ul><li>Each dot is one image (µJy against µm); colours are visits. White diamonds and orange squares are the same object in 2MASS and WISE.</li>
       <li>Points with bad pixels are hidden unless you switch them on; switch on the log axis for very red or very faint objects.</li></ul>`,
     lightcurve: `<b>Brightness over time with the colour taken out</b>: each point is divided by the target's usual brightness in that channel.
-      A steady star stays at 1; variable stars such as R Draconis and RW Aurigae move away from 1.`,
+      A steady star stays at 1; a variable star moves away from 1. Stars too bright for SPHEREx (saturated, such as Barnard's Star and R Draconis) cannot be measured, so they get no light curve.`,
     movers: `<b>How the moving-object search works.</b>
       <ul><li>Sources are found in each visit separately, and their positions are compared across visits.</li>
       <li>An object is reported only if it moves along a <b>straight line through at least three visits</b>, the motion is at least <b>5σ</b>
